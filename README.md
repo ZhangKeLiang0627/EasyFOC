@@ -5,6 +5,8 @@
 
 ---
 
+硬件开源：https://oshwhub.com/hugego/easyfoc
+
 ## Snapshot
 ![](3.pics/image-7.jpg)
 ![](3.pics/image-0.jpg)
@@ -32,3 +34,7 @@
 - 板载Oled、两颗实体按钮以及蜂鸣器方便于人机交互。
 - 引出一路IIC接口和一路SPI接口。
 - 引出SWD烧录口，方便使用`ST-Link`or`DAP-Link`进行程序烧录。
+
+## 鸣谢
+- [@稚晖君](https://github.com/peng-zhihui)的项目[Ctrl-FOC-Lite](https://github.com/peng-zhihui/Ctrl-FOC-Lite)：为本项目提供了主要的硬件设计参考。
+- 开源项目[SimpleFOC](https://github.com/simplefoc/Arduino-FOC)：为本项目提供了电机驱动算法。
