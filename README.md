@@ -5,6 +5,7 @@
 
 ---
 
+图文演示：https://zhangkeliang0627.github.io/2024/12/27/基于STM32和SimpleFOC的EasyFOC矢量控制器/README/
 硬件开源：https://oshwhub.com/hugego/easyfoc
 
 ## Snapshot
