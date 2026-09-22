@@ -14,17 +14,9 @@
 #include "MyADC.h"
 #include "Random.h"
 
-#include "w25qxx.h"
-#include "malloc.h"
-#include "ff.h"
-#include "exfuns.h"
-#include "fattester.h"
-
 #include "u8g2.h"
 #include "u8g2_Init.h"
-#include "HugoUI_User.h"
-#include "Hugo_UI.h"
-#include "FileSystem.h"
+#include "OLED_User.h"
 
 #include "FOCuser_Inc.h"
 
@@ -73,16 +65,12 @@ int main(void)
 	// ADC外设初始化
 	MyADC_Init();
 
-	// 初始化内部内存池
-	my_mem_init(SRAMIN);
-
 	// BSP初始化
 	OLED_Init();
 	LED_Init();
 	user_keyBSP_init();
 
 	// u8g2图形库初始化
-	// HugoUI_InitLayout();
 	u8g2Init(&u8g2);
 	u8g2_SetFont(&u8g2, u8g2_font_wqy13_t_gb2312a); // 选择字库，若内存不够就用u8g2_font_profont15_mr
 
@@ -115,8 +103,6 @@ int main(void)
 
 	while (1)
 	{
-		// HugoUI_System();
-
 		// __IntervalExecute(Oled_Refresh(), 1000);
 
 		// Commander_Proc();

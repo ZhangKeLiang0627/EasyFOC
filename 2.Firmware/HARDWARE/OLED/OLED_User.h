@@ -7,6 +7,11 @@
 #define NORMAL 1
 #define XOR 2
 
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define FONT_WIDTH 8
+#define FONT_HEIGHT 15
+
 /* API */
 void Oled_u8g2_ShowFloat(uint16_t x, uint16_t y, float dat, uint8_t num, uint8_t pointNum);
 void Oled_u8g2_ShowNum(uint16_t x, uint16_t y, uint16_t dat);

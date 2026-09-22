@@ -1,9 +1,9 @@
 #include "OLED.h"
+#include "OLED_User.h"
 #include "u8g2.h"
 #include "math.h"
-#include "HugoUI_User.h"
 #include "usart.h"
-#include "BEEPER.h"
+
 
 extern u8g2_t u8g2;
 extern uint32_t Time_ms;
@@ -243,9 +243,6 @@ void Oled_DrawIntensiveComputing(void)
     // 模拟噪点
     for (int i = 0; i < calculate * 256 + 256; i++)
         u8g2_DrawPixel(&u8g2, rand() % 128, rand() % 64);
-
-    Beeper_Set_Musical_Tone(1500 + calculate * 400);
-    // Beeper_Set_Musical_Tone(1500 + calculate * 400 + rand() % 64 - 32 - (((Time_ms / 1000) % 2 == 1) ? 440 : 0));
 }
 
 // 位图缩放 代码片段改自arduboy2
@@ -338,25 +335,6 @@ void Oled_SetOledInverseColor(uint8_t flag)
     }
 }
 
-/* 对于所有的Oled通用的调节屏幕亮度的函数 */
-void Oled_EventUpdateOledLightLevel(void)
-{
-    u8g2_SendF(&u8g2, "c", 0x81);                                                    // 向SSD1306发送指令：设置内部电阻微调
-    u8g2_SendF(&u8g2, "c", (uint8_t)*Slide_space[Slide_space_ScreenBrightness].val); // 微调范围（0-255）
-}
-
-/* Oled反色事件函数 */
-void Oled_EventOledInverseColor(void)
-{
-    if (*Switch_space[SwitchSpace_OledInverseColor] == true)
-    {
-        u8g2_SendF(&u8g2, "c", 0xA7);
-    }
-    else
-    {
-        u8g2_SendF(&u8g2, "c", 0xA6);
-    }
-}
 
 /* 选择字库 */
 void Oled_u8g2_SetFont(const uint8_t *font)

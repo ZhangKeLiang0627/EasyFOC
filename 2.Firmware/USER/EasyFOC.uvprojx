@@ -10,14 +10,14 @@
       <TargetName>EasyFOC</TargetName>
       <ToolsetNumber>0x4</ToolsetNumber>
       <ToolsetName>ARM-ADS</ToolsetName>
-      <pCCUsed>5060528::V5.06 update 5 (build 528)::ARMCC</pCCUsed>
+      <pCCUsed>5060960::V5.06 update 7 (build 960)::.\ARMCC</pCCUsed>
       <uAC6>0</uAC6>
       <TargetOption>
         <TargetCommonOption>
           <Device>STM32F401RE</Device>
           <Vendor>STMicroelectronics</Vendor>
-          <PackID>Keil.STM32F4xx_DFP.1.0.8</PackID>
-          <PackURL>http://www.keil.com/pack</PackURL>
+          <PackID>Keil.STM32F4xx_DFP.3.1.1</PackID>
+          <PackURL>https://www.keil.com/pack/</PackURL>
           <Cpu>IRAM(0x20000000,0x18000) IROM(0x08000000,0x60000) CPUTYPE("Cortex-M4") FPU2 CLOCK(12000000) ELITTLE</Cpu>
           <FlashUtilSpec></FlashUtilSpec>
           <StartupFile></StartupFile>
@@ -184,6 +184,8 @@
             <hadXRAM>0</hadXRAM>
             <uocXRam>0</uocXRam>
             <RvdsVP>2</RvdsVP>
+            <RvdsMve>0</RvdsMve>
+            <RvdsCdeCp>0</RvdsCdeCp>
             <hadIRAM2>0</hadIRAM2>
             <hadIROM2>0</hadIROM2>
             <StupSel>8</StupSel>
@@ -324,6 +326,7 @@
             <uThumb>0</uThumb>
             <uSurpInc>0</uSurpInc>
             <uC99>1</uC99>
+            <uGnu>0</uGnu>
             <useXO>0</useXO>
             <v6Lang>1</v6Lang>
             <v6LangP>1</v6LangP>
@@ -336,7 +339,7 @@
               <MiscControls></MiscControls>
               <Define>STM32F401xx,USE_STDPERIPH_DRIVER,__TARGET_FPU_VFP</Define>
               <Undefine></Undefine>
-              <IncludePath>..\CORE;..\SYSTEM\delay;..\SYSTEM\sys;..\SYSTEM\usart;..\USER;..\MALLOC;..\FATFS\exfuns;..\FATFS\src;..\FWLIB\inc;..\TEXT;..\SYSTEM;..\Libraries\SimpleFOC;..\Libraries\U8G2;..\HARDWARE\ADC;..\HARDWARE\AS5600;..\HARDWARE\BEEPER;..\HARDWARE\DMA;..\HARDWARE\FileSystem;..\HARDWARE\Hugo_UI;..\HARDWARE\LED;..\HARDWARE\MPU6050;..\HARDWARE\MultiButton;..\HARDWARE\OLED;..\HARDWARE\Random;..\HARDWARE\SD;..\HARDWARE\SPI;..\HARDWARE\W25QXX;..\HARDWARE\MyIIC;..\HARDWARE\AS5047P;..\FreeRTOS\include;..\FreeRTOS\portable\RVDS\ARM_CM4F</IncludePath>
+              <IncludePath>..\CORE;..\SYSTEM\delay;..\SYSTEM\sys;..\SYSTEM\usart;..\USER;..\FWLIB\inc;..\SYSTEM;..\Libraries\SimpleFOC;..\Libraries\U8G2;..\HARDWARE\ADC;..\HARDWARE\AS5600;..\HARDWARE\BEEPER;..\HARDWARE\DMA;..\HARDWARE\LED;..\HARDWARE\MPU6050;..\HARDWARE\MultiButton;..\HARDWARE\OLED;..\HARDWARE\Random;..\HARDWARE\SPI;..\HARDWARE\MyIIC;..\HARDWARE\AS5047P;..\FreeRTOS\include;..\FreeRTOS\portable\RVDS\ARM_CM4F</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -349,7 +352,7 @@
             <NoWarn>0</NoWarn>
             <uSurpInc>0</uSurpInc>
             <useXO>0</useXO>
-            <uClangAs>0</uClangAs>
+            <ClangAsOpt>4</ClangAsOpt>
             <VariousControls>
               <MiscControls></MiscControls>
               <Define></Define>
@@ -481,26 +484,6 @@
               <FilePath>..\HARDWARE\AS5600\AS5600.h</FilePath>
             </File>
             <File>
-              <FileName>w25qxx.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\HARDWARE\W25QXX\w25qxx.c</FilePath>
-            </File>
-            <File>
-              <FileName>w25qxx.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\HARDWARE\W25QXX\w25qxx.h</FilePath>
-            </File>
-            <File>
-              <FileName>MMC_SD.C</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\HARDWARE\SD\MMC_SD.C</FilePath>
-            </File>
-            <File>
-              <FileName>mmc_sd.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\HARDWARE\SD\mmc_sd.h</FilePath>
-            </File>
-            <File>
               <FileName>MyADC.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\HARDWARE\ADC\MyADC.c</FilePath>
@@ -529,6 +512,16 @@
               <FileName>AS5047P.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\HARDWARE\AS5047P\AS5047P.h</FilePath>
+            </File>
+            <File>
+              <FileName>OLED_User.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\OLED\OLED_User.c</FilePath>
+            </File>
+            <File>
+              <FileName>OLED_User.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\HARDWARE\OLED\OLED_User.h</FilePath>
             </File>
           </Files>
         </Group>
@@ -634,51 +627,6 @@
               <FileName>stm32f4xx_adc.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\FWLIB\src\stm32f4xx_adc.c</FilePath>
-            </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>MALLOC</GroupName>
-          <Files>
-            <File>
-              <FileName>malloc.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\MALLOC\malloc.c</FilePath>
-            </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>FATFS</GroupName>
-          <Files>
-            <File>
-              <FileName>diskio.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\FATFS\src\diskio.c</FilePath>
-            </File>
-            <File>
-              <FileName>ff.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\FATFS\src\ff.c</FilePath>
-            </File>
-            <File>
-              <FileName>exfuns.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\FATFS\exfuns\exfuns.c</FilePath>
-            </File>
-            <File>
-              <FileName>fattester.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\FATFS\exfuns\fattester.c</FilePath>
-            </File>
-            <File>
-              <FileName>mycc936.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\FATFS\exfuns\mycc936.c</FilePath>
-            </File>
-            <File>
-              <FileName>fontupd.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\TEXT\fontupd.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -909,61 +857,6 @@
               <FileName>u8x8_u16toa.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Libraries\U8G2\u8x8_u16toa.c</FilePath>
-            </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>HugoUI</GroupName>
-          <Files>
-            <File>
-              <FileName>Hugo_UI.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\HARDWARE\Hugo_UI\Hugo_UI.c</FilePath>
-            </File>
-            <File>
-              <FileName>Hugo_UI.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\HARDWARE\Hugo_UI\Hugo_UI.h</FilePath>
-            </File>
-            <File>
-              <FileName>HugoUI_BMP.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\HARDWARE\Hugo_UI\HugoUI_BMP.c</FilePath>
-            </File>
-            <File>
-              <FileName>HugoUI_BMP.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\HARDWARE\Hugo_UI\HugoUI_BMP.h</FilePath>
-            </File>
-            <File>
-              <FileName>HugoUI_User.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\HARDWARE\Hugo_UI\HugoUI_User.c</FilePath>
-            </File>
-            <File>
-              <FileName>HugoUI_User.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\HARDWARE\Hugo_UI\HugoUI_User.h</FilePath>
-            </File>
-            <File>
-              <FileName>OLED_User.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\HARDWARE\OLED\OLED_User.c</FilePath>
-            </File>
-            <File>
-              <FileName>OLED_User.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\HARDWARE\OLED\OLED_User.h</FilePath>
-            </File>
-            <File>
-              <FileName>FileSystem.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\HARDWARE\FileSystem\FileSystem.c</FilePath>
-            </File>
-            <File>
-              <FileName>FileSystem.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\HARDWARE\FileSystem\FileSystem.h</FilePath>
             </File>
           </Files>
         </Group>
