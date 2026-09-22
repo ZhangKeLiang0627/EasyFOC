@@ -118,7 +118,8 @@ void EasyFOC_Init(void)
 	InlineCurrentSense(0.01f, 50, ADC_Channel_14, ADC_Channel_15, NOT_SET); // SimpleMotor // 采样电阻阻值，运放倍数，A相，B相，C相
 	InlineCurrentSense_Init();												// ADC初始化和偏置电压校准
 
-	MagneticSensor_OptionSelect(MAGNETIC_SENSOR_AS5600); // 磁编码器选择AS5047P
+	// MagneticSensor_OptionSelect(MAGNETIC_SENSOR_AS5600); // 磁编码器选择AS5600
+	MagneticSensor_OptionSelect(MAGNETIC_SENSOR_AS5047P); // 磁编码器选择AS5047P
 	MagneticSensor_Init(); // 磁编码器初始化
 	LPF_init();			   // LPF参数初始化
 	PID_init();			   // PID参数初始化

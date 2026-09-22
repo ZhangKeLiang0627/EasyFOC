@@ -20,12 +20,13 @@
 
 #include "FOCuser_Inc.h"
 
-u8g2_t u8g2; // 初始化u8g2结构体
+u8g2_t u8g2; 
 
 uint8_t KeyNum = 0;
 uint8_t EncoderNum = 0;
 
-float target; // 控制电机转速 rad/s(0圈/秒)
+// 控制电机转速 rad/s (圈/秒)
+float target; 
 float angle;
 float BatteryVoltage;
 extern uint8_t USART6_Recive_flag;
@@ -92,7 +93,7 @@ int main(void)
 	Oled_u8g2_ShowUTF8(0, FONT_HEIGHT * 2.5f, "Ready! 电机准备好啦!");
 	Oled_u8g2_SendBuffer();
 
-	// xTaskCreate((TaskFunction_t)led0_task, "led0_task", 512, NULL, 2, &LED0Task_Handler);
+	xTaskCreate((TaskFunction_t)led0_task, "led0_task", 512, NULL, 2, &LED0Task_Handler);
 	xTaskCreate((TaskFunction_t)OledRefresh_task, "OledRefresh_task", 512, NULL, 6, &OledRefreshTask_Handler);
 	xTaskCreate((TaskFunction_t)CommanderProc_task, "CommanderProc_task", 512, NULL, 6, &CommanderProcTask_Handler);
 	xTaskCreate((TaskFunction_t)KeyProc_task, "KeyProc_task", 512, NULL, 6, &KeyProcTask_Handler);
@@ -289,7 +290,7 @@ void led0_task(void *pvParameters)
 	{
 		LED0 = ~LED0;
 
-		printf("FreeRTOS is working!\r\n");
+		// printf("FreeRTOS is working!\r\n");
 
 		vTaskDelay(500);
 	}
