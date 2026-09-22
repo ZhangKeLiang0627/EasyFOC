@@ -78,19 +78,19 @@ int main(void)
 	// Oled打印：正在初始化
 	printf("[System] Motor init...\r\n");
 	Oled_u8g2_ClearBuffer();
-	Oled_u8g2_ShowUTF8(0, FONT_HEIGHT * 2.5f, "Init...电机准备中...");
+	Oled_u8g2_ShowUTF8(0, FONT_HEIGHT * 2.5f, "Init...");
 	Oled_u8g2_SendBuffer();
 
 	// EasyFOC初始化
 	EasyFOC_Init();
-	// M1_Disable();
-	M1_Enable();
-	target = 3.0f;
+	M1_Disable();
+	// M1_Enable();
+	target = 0.0f; // 开机不转，等待串口命令（S0/S1选编码器、E U使能、T设转速）
 
 	// Oled打印：准备完毕
 	printf("[System] Motor ready!\r\n");
 	Oled_u8g2_ClearBuffer();
-	Oled_u8g2_ShowUTF8(0, FONT_HEIGHT * 2.5f, "Ready! 电机准备好啦!");
+	Oled_u8g2_ShowUTF8(0, FONT_HEIGHT * 2.5f, "Ready!!!");
 	Oled_u8g2_SendBuffer();
 
 	// xTaskCreate((TaskFunction_t)led0_task, "led0_task", 64, NULL, 2, &LED0Task_Handler);

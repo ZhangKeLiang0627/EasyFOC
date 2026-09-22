@@ -118,8 +118,8 @@ void EasyFOC_Init(void)
 	InlineCurrentSense(0.01f, 50, ADC_Channel_14, ADC_Channel_15, NOT_SET); // SimpleMotor // 采样电阻阻值，运放倍数，A相，B相，C相
 	InlineCurrentSense_Init();												// ADC初始化和偏置电压校准
 
-	MagneticSensor_OptionSelect(MAGNETIC_SENSOR_AS5600); // 磁编码器选择AS5600
-	// MagneticSensor_OptionSelect(MAGNETIC_SENSOR_AS5047P); // 磁编码器选择AS5047P
+	MagneticSensor_OptionSelect(MAGNETIC_SENSOR_AS5047P); // 磁编码器选择AS5047P（默认）
+	// MagneticSensor_OptionSelect(MAGNETIC_SENSOR_AS5600); // 磁编码器选择AS5600
 	MagneticSensor_Init(); // 磁编码器初始化
 	LPF_init();			   // LPF参数初始化
 	PID_init();			   // PID参数初始化
@@ -131,7 +131,7 @@ void EasyFOC_Init(void)
 	current_limit = 20;				  // 50	// A，foc_current和dc_current模式限制电流，不能为0。速度模式和位置模式起作用
 	torque_controller = Type_voltage; // 当前只有电压模式
 	controller = Type_velocity;		  // Type_angle; //Type_torque; //Type_velocity
-	pole_pairs = 7;					  // 电机极对数，按照实际设置，虽然可以上电检测但有失败的概率
+	pole_pairs = 11;				  // 电机极对数，3505电机+AS5047P为11；虽然可以上电检测但有失败的概率
 
 	PID_velocity.P = 0.11f; // 速度环PI参数，只用P参数方便快速调试
 	PID_velocity.I = 0.98f;
@@ -147,7 +147,7 @@ void EasyFOC_Init(void)
 	LPF_velocity.Tf = 0.01f;
 
 	Motor_init();
-	Motor_initFOC(0, UNKNOWN); // (0,UNKNOWN) // 第一次先获得偏移角和方向，填入代码编译后再下载，以后可以跳过零点校准
+	Motor_initFOC(1.3760f, CW); // 已校准：提供偏移角和方向，开机跳过零点校准（不转电机）
 
 	// TIM10_Count_Init(); // interrupt per 1ms
 
