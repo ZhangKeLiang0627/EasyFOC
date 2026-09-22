@@ -209,6 +209,16 @@ void Commander_Proc(void)
 			printf("P=%.2f\r\n", PID_velocity.P);
 			break;
 
+		case 'Q': // Q3.0  设置电流环P参数（DC current / foc current 模式用，单位欧姆）
+			PID_current_q.P = atof((const char *)(USART6_RX_BUF + 1));
+			printf("CurrentP=%.2f\r\n", PID_current_q.P);
+			break;
+
+		case 'W': // W100  设置电流环I参数（DC current / foc current 模式用，单位欧姆/秒）
+			PID_current_q.I = atof((const char *)(USART6_RX_BUF + 1));
+			printf("CurrentI=%.2f\r\n", PID_current_q.I);
+			break;
+
 		case 'I': // I0.2  设置速度环的I参数
 			PID_velocity.I = atof((const char *)(USART6_RX_BUF + 1));
 			printf("I=%.2f\r\n", PID_velocity.I);
@@ -221,6 +231,17 @@ void Commander_Proc(void)
 		case 'A': // A  读绝对角度
 			printf("Ang=%.2f\r\n", shaft_angle);
 			break;
+
+		case 'C': // C  只读电流采样（不碰闭环），用于标定符号/偏移/增益
+		{
+			unsigned short rawA = analogRead(ADC_SENSE_A);
+			unsigned short rawB = analogRead(ADC_SENSE_B);
+			PhaseCurrent_s pc = getPhaseCurrents();
+			DQCurrent_s dq = getFOCCurrents(electrical_angle);
+			printf("[C] rawA=%d rawB=%d | ia=%.3f ib=%.3f | theta=%.2f Id=%.3f Iq=%.3f\r\n",
+				   rawA, rawB, pc.a, pc.b, electrical_angle, dq.d, dq.q);
+		}
+		break;
 
 		case 'E': // E 电机使能，U -> PowerUP使能 / D -> PowerDown失能
 			switch (USART6_RX_BUF[1])
@@ -269,6 +290,27 @@ void Commander_Proc(void)
 
 			default:
 				printf("Mode = ErrInput!\r\n");
+				break;
+			}
+			break;
+
+		case 'N': // N 切换力矩控制方式，V -> 电压模式 / C -> DC current 电流闭环
+			switch (USART6_RX_BUF[1])
+			{
+			case 'V':
+				target = 0;
+				torque_controller = Type_voltage;
+				printf("TorqueCtrl = Voltage!\r\n");
+				break;
+
+			case 'C':
+				target = 0;
+				torque_controller = Type_dc_current;
+				printf("TorqueCtrl = DC current!\r\n");
+				break;
+
+			default:
+				printf("ErrInput!\r\n");
 				break;
 			}
 			break;

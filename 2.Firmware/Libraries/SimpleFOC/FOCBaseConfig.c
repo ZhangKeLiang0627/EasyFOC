@@ -128,7 +128,7 @@ void EasyFOC_Init(void)
 	voltage_sensor_align = 4.0f;	  // V，航模电机设置的值小一点比如0.5-1，云台电机设置的大一点比如2-3
 	voltage_limit = 6.0f;			  // V，主要为限制电机最大电流，最大值需小于12/1.732=6.9
 	velocity_limit = 40;			  // rad/s，角度模式时限制最大转速，力矩模式和速度模式不起作用
-	current_limit = 20;				  // 50	// A，foc_current和dc_current模式限制电流，不能为0。速度模式和位置模式起作用
+	current_limit = 1.0f;			  // A，3505额定≤0.5A，限幅1A保护；foc_current/dc_current模式限制电流
 	torque_controller = Type_voltage; // 当前只有电压模式
 	controller = Type_velocity;		  // Type_angle; //Type_torque; //Type_velocity
 	pole_pairs = 11;				  // 电机极对数，3505电机+AS5047P为11；虽然可以上电检测但有失败的概率
@@ -140,8 +140,8 @@ void EasyFOC_Init(void)
 
 	PID_current_d.P = 0.2f; // 电流环PI参数，可以进入 PID_init() 函数中修改其它参数
 	PID_current_d.I = 0;	// 电流环I参数不太好调试，设置为0只用P参数也可以
-	PID_current_q.P = 0.16f;
-	PID_current_q.I = 0;
+	PID_current_q.P = 3.0f; // 电流环P单位=欧姆(≈相电阻)，保守初值3，运行时用 Q 命令调
+	PID_current_q.I = 50.0f; // 电流环I单位=欧姆/秒，保守初值50消除稳态误差，运行时用 W 命令慢慢加
 
 	PID_velocity.output_ramp = 0; // 速度爬升斜率，如果不需要可以设置为0
 	LPF_velocity.Tf = 0.01f;

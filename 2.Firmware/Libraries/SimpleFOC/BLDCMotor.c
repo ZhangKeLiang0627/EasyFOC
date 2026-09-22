@@ -200,7 +200,7 @@ void move(float new_target)
 			voltage.q = new_target; // if voltage torque control
 		}
 		else
-			current_sp = new_target; // if current/foc_current torque control
+			current_sp = _constrain(new_target, -current_limit, current_limit); // 电流目标限幅，防止大电流命令失控
 		break;
 	case Type_angle:
 		// angle set point

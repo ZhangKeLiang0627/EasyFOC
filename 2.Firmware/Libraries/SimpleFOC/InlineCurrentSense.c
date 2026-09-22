@@ -22,8 +22,7 @@ void InlineCurrentSense(float _shunt_resistor, float _gain, int _pinA, int _pinB
 
 	volts_to_amps_ratio = 1.0f / _shunt_resistor / _gain; // volts to amps
 
-	gain_a = volts_to_amps_ratio;
-	// gain_b = -volts_to_amps_ratio;
+	gain_a = -volts_to_amps_ratio; // A/B两相采样方向相反(gain异号)；整体取负使正转Iq>0，与voltage.q同号，避免DC current正反馈堵转
 	gain_b = volts_to_amps_ratio;
 	gain_c = volts_to_amps_ratio;
 
