@@ -148,7 +148,7 @@ void EasyFOC_Init(void)
 	Motor_init();
 	Motor_initFOC(0, UNKNOWN); // (0,UNKNOWN) // 第一次先获得偏移角和方向，填入代码编译后再下载，以后可以跳过零点校准
 
-	TIM10_Count_Init(); // interrupt per 1ms
+	// TIM10_Count_Init(); // interrupt per 1ms
 
 	printf("EasyFOC Init is OK!\r\nMotor is ready.\r\n");
 }
