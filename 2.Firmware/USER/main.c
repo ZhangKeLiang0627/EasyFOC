@@ -93,11 +93,11 @@ int main(void)
 	Oled_u8g2_ShowUTF8(0, FONT_HEIGHT * 2.5f, "Ready! 电机准备好啦!");
 	Oled_u8g2_SendBuffer();
 
-	xTaskCreate((TaskFunction_t)led0_task, "led0_task", 64, NULL, 2, &LED0Task_Handler);
+	// xTaskCreate((TaskFunction_t)led0_task, "led0_task", 64, NULL, 2, &LED0Task_Handler);
 	xTaskCreate((TaskFunction_t)OledRefresh_task, "OledRefresh_task", 512, NULL, 6, &OledRefreshTask_Handler);
-	xTaskCreate((TaskFunction_t)CommanderProc_task, "CommanderProc_task", 256, NULL, 6, &CommanderProcTask_Handler);
-	xTaskCreate((TaskFunction_t)KeyProc_task, "KeyProc_task", 128, NULL, 6, &KeyProcTask_Handler);
-	xTaskCreate((TaskFunction_t)BeepProc_task, "BeepProc_task", 128, NULL, 6, &BeepProcTask_Handler);
+	xTaskCreate((TaskFunction_t)CommanderProc_task, "CommanderProc_task", 512, NULL, 6, &CommanderProcTask_Handler);
+	xTaskCreate((TaskFunction_t)KeyProc_task, "KeyProc_task", 512, NULL, 6, &KeyProcTask_Handler);
+	xTaskCreate((TaskFunction_t)BeepProc_task, "BeepProc_task", 512, NULL, 6, &BeepProcTask_Handler);
 	xTaskCreate((TaskFunction_t)FOCLoop_task, "FOCLoop_task", 512, NULL, 6, &FOCLoopTask_Handler);
 
 	vTaskStartScheduler(); // 开启任务调度
