@@ -98,7 +98,7 @@ int main(void)
 	xTaskCreate((TaskFunction_t)CommanderProc_task, "CommanderProc_task", 512, NULL, 6, &CommanderProcTask_Handler);
 	xTaskCreate((TaskFunction_t)KeyProc_task, "KeyProc_task", 512, NULL, 6, &KeyProcTask_Handler);
 	xTaskCreate((TaskFunction_t)BeepProc_task, "BeepProc_task", 512, NULL, 6, &BeepProcTask_Handler);
-	xTaskCreate((TaskFunction_t)FOCLoop_task, "FOCLoop_task", 512, NULL, 6, &FOCLoopTask_Handler);
+	xTaskCreate((TaskFunction_t)FOCLoop_task, "FOCLoop_task", 512 * 2, NULL, 6, &FOCLoopTask_Handler);
 
 	vTaskStartScheduler(); // 开启任务调度
 

@@ -107,8 +107,8 @@ float getBetteryVolt(void)
 {
     uint16_t raw = MyADC_GetValue(ADC_BATTERY);
 
-    float val = (3.3f / 4096) * (raw + 100); // 这里 +100 的操作是为了弥补ADC检测与现实计算的误差
-
+    float val = (3.3f / 4096) * (raw);
+    // printf("raw = %d, val = %f\r\n", raw, val);
     return val;
 }
 
