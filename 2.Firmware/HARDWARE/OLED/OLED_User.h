@@ -39,14 +39,9 @@ void Oled_u8g2_SetFlipMode(uint8_t mode);
 void Oled_u8g2_SetFont(const uint8_t *font);
 void Oled_SetOledInverseColor(uint8_t flag);
 
-void Oled_DrawIntensiveComputing(void);
 void Oled_DrawIntensiveComputingLine(void);
 void Oled_DrawSlowBitmapResize(int x, int y, const uint8_t *bitmap, int w1, int h1, int w2, int h2);
 void Oled_DrawSlowBitmapResize2(int x, int y, const uint8_t *bitmap, int w1, int h1, int w2, int h2);
 void Oled_ScreenshotPrint(void);
-
-/* Event */
-void Oled_EventUpdateOledLightLevel(void);
-void Oled_EventOledInverseColor(void);
 
 #endif

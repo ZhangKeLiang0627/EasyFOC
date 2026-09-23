@@ -4,9 +4,8 @@
 #include "math.h"
 #include "usart.h"
 
-
 extern u8g2_t u8g2;
-extern uint32_t Time_ms;
+
 void Oled_u8g2_ShowStr(uint16_t x, uint16_t y, char *str)
 {
     u8g2_DrawStr(&u8g2, x, y, str);
@@ -230,19 +229,6 @@ void Oled_DrawIntensiveComputingLine(void)
             u8g2_DrawVLine(&u8g2, Line[a] + rand() % 20 - 10, 0, 64);  // 垂直线
         }
     }
-}
-//
-/* Oled FP密集运算屏保 */
-void Oled_DrawIntensiveComputing(void)
-{
-    float calculate;
-    // 随机线条
-    Oled_DrawIntensiveComputingLine();
-
-    calculate = sinf(Time_ms / 4000.0f);
-    // 模拟噪点
-    for (int i = 0; i < calculate * 256 + 256; i++)
-        u8g2_DrawPixel(&u8g2, rand() % 128, rand() % 64);
 }
 
 // 位图缩放 代码片段改自arduboy2

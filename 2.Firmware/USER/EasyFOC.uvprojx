@@ -339,7 +339,7 @@
               <MiscControls></MiscControls>
               <Define>STM32F401xx,USE_STDPERIPH_DRIVER,__TARGET_FPU_VFP</Define>
               <Undefine></Undefine>
-              <IncludePath>..\CORE;..\SYSTEM\delay;..\SYSTEM\sys;..\SYSTEM\usart;..\USER;..\FWLIB\inc;..\SYSTEM;..\Libraries\SimpleFOC;..\Libraries\U8G2;..\HARDWARE\ADC;..\HARDWARE\AS5600;..\HARDWARE\BEEPER;..\HARDWARE\DMA;..\HARDWARE\LED;..\HARDWARE\MPU6050;..\HARDWARE\MultiButton;..\HARDWARE\OLED;..\HARDWARE\Random;..\HARDWARE\SPI;..\HARDWARE\MyIIC;..\HARDWARE\AS5047P;..\FreeRTOS\include;..\FreeRTOS\portable\RVDS\ARM_CM4F</IncludePath>
+              <IncludePath>..\CORE;..\SYSTEM\delay;..\SYSTEM\sys;..\SYSTEM\usart;..\USER;..\FWLIB\inc;..\SYSTEM;..\Libraries\SimpleFOC;..\Libraries\U8G2;..\HARDWARE\ADC;..\HARDWARE\AS5600;..\HARDWARE\BEEPER;..\HARDWARE\LED;..\HARDWARE\MultiButton;..\HARDWARE\OLED;..\HARDWARE\SPI;..\HARDWARE\MyIIC;..\HARDWARE\AS5047P;..\FreeRTOS\include;..\FreeRTOS\portable\RVDS\ARM_CM4F</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -442,16 +442,6 @@
               <FileName>BEEPER.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\HARDWARE\BEEPER\BEEPER.h</FilePath>
-            </File>
-            <File>
-              <FileName>Random.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\HARDWARE\Random\Random.c</FilePath>
-            </File>
-            <File>
-              <FileName>Random.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\HARDWARE\Random\Random.h</FilePath>
             </File>
             <File>
               <FileName>multi_button.c</FileName>
