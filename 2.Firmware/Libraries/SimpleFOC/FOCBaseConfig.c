@@ -15,8 +15,8 @@ void TIM3_PWM_Init(u16 arr)
 	/*初始化TIM3*/
 	TIM_TimeBaseInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
 	TIM_TimeBaseInitStructure.TIM_CounterMode = TIM_CounterMode_CenterAligned1; // 中心对称1!
-	TIM_TimeBaseInitStructure.TIM_Period = arr - 1;								// ARR = 3360
-	TIM_TimeBaseInitStructure.TIM_Prescaler = 1 - 1;							// 使得频率剩下25kHz
+	TIM_TimeBaseInitStructure.TIM_Period = arr - 1;								// ARR = PWM_Period - 1 = 2100
+	TIM_TimeBaseInitStructure.TIM_Prescaler = 1 - 1;							// PSC = 0, 定时器时钟 84MHz -> f = 84MHz/(2*2100) = 20kHz
 	TIM_TimeBaseInitStructure.TIM_RepetitionCounter = 0;
 	TIM_TimeBaseInit(TIM3, &TIM_TimeBaseInitStructure);
 

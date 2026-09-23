@@ -33,6 +33,8 @@
 #define M1_Enable() GPIO_SetBits(GPIOC, GPIO_Pin_14)     // 高电平使能
 #define M1_Disable() GPIO_ResetBits(GPIOC, GPIO_Pin_14); // 低电平解除
 
-#define PWM_Period (1680 * 2)                            // 1680 * 2 -> 25kHz // TIM3 -> 84MHz
+/* PWM频率: TIM3时钟84MHz, 中心对齐, 实际频率 f = 84MHz / (2 * ARR) */
+#define PWM_Period (2100)                            // 20kHz: ARR = 2100 -> 84MHz / (2 * 2100) = 20.000kHz
+// #define PWM_Period (1680)                         // ARR = 1680 -> 84MHz / (2 * 1680) = 25.000kHz
 
 #endif
