@@ -14,6 +14,12 @@ unsigned long open_loop_timestamp;
 float velocity_limit;
 float current_limit;
 /******************************************************************************/
+// DWT 计时统计（loopFOCISR 单次执行耗时，单位 CPU 周期 @84MHz）
+uint32_t foc_cycles_min = 0xFFFFFFFF;
+uint32_t foc_cycles_max = 0;
+uint32_t foc_cycles_sum = 0;
+uint32_t foc_cycles_cnt = 0;
+/******************************************************************************/
 int alignSensor(void);
 float velocityOpenloop(float target_velocity);
 float angleOpenloop(float target_angle);
@@ -57,9 +63,9 @@ void Motor_initFOC(float zero_electric_offset, Direction _sensor_direction)
 	// added the shaft_angle update
 	angle_prev = getAngle(); // getVelocity(), make sure velocity = 0 after power on
 	delay_ms(50);
+	shaft_angle = shaftAngle(); // 先更新 shaft_angle，供 shaftVelocity() 差分初始化（避免首次算出虚假速度）
 	shaft_velocity = shaftVelocity(); // 必须调用一次，进入主循环后速度为0
 	delay_ms(5);
-	shaft_angle = shaftAngle(); // shaft angle
 	if (controller == Type_angle)
 		target = shaft_angle; // 角度模式，以当前的角速度为目标角度，进入主循环后电机静止
 
@@ -186,6 +192,73 @@ void loopFOC(void)
 	}
 	// set the phase voltage - FOC heart function :)
 	setPhaseVoltage(voltage.q, voltage.d, electrical_angle);
+}
+/******************************************************************************/
+// 20kHz 中断版电流环（TIM3 下溢中断里调用）
+// 与原 loopFOC() 的差异：
+//   1. 采样用「注入组 + MyADC_StartInjected」，先启动转换，再读角（SPI 阻塞期间 ADC 并行转换），
+//      最后读 JDR，零阻塞、采样点与 PWM 零矢量对齐（由 TIM3 下溢中断保证）；
+//   2. PID/LPF 用固定 dt 版本（FOC_ISR_TS = 50us），不读 SysTick（高优先级中断里 SysTick 被挂起）；
+//   3. 去掉 printf（中断里禁止），default 分支静默。
+void loopFOCISR(void)
+{
+	uint32_t t0, t1, dt;
+
+	t0 = DWT_GetCycle(); // 计时起点
+
+	if (controller == Type_angle_openloop || controller == Type_velocity_openloop)
+		return;
+
+	// 1. 启动注入组转换（CH14/CH15 依次转换，约 2.6us，与下面 SPI 读角并行）
+	MyADC_StartInjected();
+
+	// 2. 读角度（SPI 阻塞约 2-3us，期间 ADC 注入组并行转换）
+	shaft_angle = shaftAngle();			  // shaft angle
+	electrical_angle = electricalAngle(); // electrical angle - need shaftAngle to be called first
+
+	switch (torque_controller)
+	{
+	case Type_voltage: // no need to do anything really
+		break;
+	case Type_dc_current:
+		// 等注入组转换完成（通常此时已转换完，几乎不阻塞，仅作兜底）
+		while (!ADC_GetFlagStatus(ADC1, ADC_FLAG_JEOC));
+		// read overall current magnitude
+		current.q = getDCCurrentISR(electrical_angle);
+		// filter the value values
+		current.q = LPFoperator_dt(&LPF_current_q, current.q, FOC_ISR_TS);
+		// calculate the phase voltage
+		voltage.q = PIDoperator_dt(&PID_current_q, (current_sp - current.q), FOC_ISR_TS);
+		voltage.d = 0;
+		break;
+	case Type_foc_current:
+		// 等注入组转换完成
+		while (!ADC_GetFlagStatus(ADC1, ADC_FLAG_JEOC));
+		// read dq currents
+		current = getFOCCurrentsISR(electrical_angle);
+		// filter values
+		current.q = LPFoperator_dt(&LPF_current_q, current.q, FOC_ISR_TS);
+		current.d = LPFoperator_dt(&LPF_current_d, current.d, FOC_ISR_TS);
+		// calculate the phase voltages
+		voltage.q = PIDoperator_dt(&PID_current_q, (current_sp - current.q), FOC_ISR_TS);
+		voltage.d = PIDoperator_dt(&PID_current_d, -current.d, FOC_ISR_TS);
+		break;
+	default:
+		// 中断里禁止 printf，静默处理
+		break;
+	}
+	// set the phase voltage - FOC heart function :)
+	setPhaseVoltage(voltage.q, voltage.d, electrical_angle);
+
+	// 计时统计
+	t1 = DWT_GetCycle();
+	dt = t1 - t0;
+	if (dt < foc_cycles_min)
+		foc_cycles_min = dt;
+	if (dt > foc_cycles_max)
+		foc_cycles_max = dt;
+	foc_cycles_sum += dt;
+	foc_cycles_cnt++;
 }
 /******************************************************************************/
 void move(float new_target)

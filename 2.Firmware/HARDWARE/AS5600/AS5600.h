@@ -15,6 +15,13 @@ extern "C"
 /* define AS5600 IIC address */
 #define AS5600_IIC_ADDR 0x36	
 
+/*
+ * I2C 驱动方式选择（软/硬二选一，引脚完全一致，无需改硬件）：
+ *   0 = 软件 I2C（MyIIC2，GPIO 模拟时序）
+ *   1 = 硬件 I2C3（PA8=SCL / PB4=SDA，外设收发，400kHz 快速模式）
+ */
+#define AS5600_USE_HW_I2C 0
+
 #define AS5600_CPR 4096 //12bit Resolution
 	
 void AS5600_Write_Byte(uint8_t addr, uint8_t dat);

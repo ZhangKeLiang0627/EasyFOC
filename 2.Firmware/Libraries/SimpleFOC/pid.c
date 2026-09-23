@@ -99,3 +99,48 @@ float PIDoperator(PIDController *PID, float error)
 	return output;
 }
 /******************************************************************************/
+// PID控制器（固定采样周期版本）
+// 用于 20kHz 电流环中断：Ts 恒等于中断周期（50us），不读 SysTick（高优先级中断里 SysTick 被挂起，
+// _micros() 会返回旧值导致 dt 计算错误）。积分/微分都随 Ts 缩放，P/I/D 参数无需重调。
+float PIDoperator_dt(PIDController *PID, float error, float Ts)
+{
+	float proportional, integral, derivative, output;
+	float output_rate;
+
+	// u(s) = (P + I/s + Ds)e(s)
+	// Discrete implementations
+	// proportional part
+	proportional = PID->P * error;
+	// Tustin transform of the integral part
+	// u_ik = u_ik_1  + I*Ts/2*(ek + ek_1)
+	integral = PID->integral_prev + PID->I * Ts * 0.5f * (error + PID->error_prev);
+	// antiwindup - limit the output
+	integral = _constrain(integral, -PID->limit, PID->limit);
+	// Discrete derivation
+	// u_dk = D(ek - ek_1)/Ts
+	derivative = PID->D * (error - PID->error_prev) / Ts;
+
+	// sum all the components
+	output = proportional + integral + derivative;
+	// antiwindup - limit the output variable
+	output = _constrain(output, -PID->limit, PID->limit);
+
+	// if output ramp defined
+	if (PID->output_ramp > 0)
+	{
+		// limit the acceleration by ramping the output
+		output_rate = (output - PID->output_prev) / Ts;
+		if (output_rate > PID->output_ramp)
+			output = PID->output_prev + PID->output_ramp * Ts;
+		else if (output_rate < -PID->output_ramp)
+			output = PID->output_prev - PID->output_ramp * Ts;
+	}
+
+	// saving for the next pass
+	PID->integral_prev = integral;
+	PID->output_prev = output;
+	PID->error_prev = error;
+
+	return output;
+}
+/******************************************************************************/

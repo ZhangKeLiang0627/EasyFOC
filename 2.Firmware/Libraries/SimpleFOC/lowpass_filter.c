@@ -42,3 +42,15 @@ float LPFoperator(LowPassFilter *LPF, float x)
 	return y;
 }
 /******************************************************************************/
+// 低通滤波器（固定采样周期版本）：中断里 dt 恒为固定值，不读 SysTick
+float LPFoperator_dt(LowPassFilter *LPF, float x, float dt)
+{
+	float alpha, y;
+
+	alpha = LPF->Tf / (LPF->Tf + dt);
+	y = alpha * LPF->y_prev + (1.0f - alpha) * x;
+	LPF->y_prev = y;
+
+	return y;
+}
+/******************************************************************************/

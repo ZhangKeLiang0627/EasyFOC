@@ -40,6 +40,34 @@ float getDCCurrent(float motor_electrical_angle)
 	return sign * _sqrt(i_alpha * i_alpha + i_beta * i_beta);
 }
 /******************************************************************************/
+// 中断版：与 getDCCurrent 相同，但内部改用 getPhaseCurrentsISR（读注入组，非阻塞）
+float getDCCurrentISR(float motor_electrical_angle)
+{
+	PhaseCurrent_s current;
+	float sign = 1;
+	float i_alpha, i_beta;
+
+	current = getPhaseCurrentsISR();
+
+	if (!current.c)
+	{
+		i_alpha = current.a;
+		i_beta = _1_SQRT3 * current.a + _2_SQRT3 * current.b;
+	}
+	else
+	{
+		float mid = (1.0f / 3) * (current.a + current.b + current.c);
+		float a = current.a - mid;
+		float b = current.b - mid;
+		i_alpha = a;
+		i_beta = _1_SQRT3 * a + _2_SQRT3 * b;
+	}
+
+	if (motor_electrical_angle)
+		sign = (i_beta * _cos(motor_electrical_angle) - i_alpha * _sin(motor_electrical_angle)) > 0 ? 1 : -1;
+	return sign * _sqrt(i_alpha * i_alpha + i_beta * i_beta);
+}
+/******************************************************************************/
 // function used with the foc algorihtm
 //   calculating DQ currents from phase currents
 //   - function calculating park and clarke transform of the phase currents
@@ -72,6 +100,37 @@ DQCurrent_s getFOCCurrents(float angle_el)
 	}
 
 	// calculate park transform
+	ct = _cos(angle_el);
+	st = _sin(angle_el);
+	ret.d = i_alpha * ct + i_beta * st;
+	ret.q = i_beta * ct - i_alpha * st;
+	return ret;
+}
+/******************************************************************************/
+// 中断版：与 getFOCCurrents 相同，但内部改用 getPhaseCurrentsISR（读注入组，非阻塞）
+DQCurrent_s getFOCCurrentsISR(float angle_el)
+{
+	PhaseCurrent_s current;
+	float i_alpha, i_beta;
+	float ct, st;
+	DQCurrent_s ret;
+
+	current = getPhaseCurrentsISR();
+
+	if (!current.c)
+	{
+		i_alpha = current.a;
+		i_beta = _1_SQRT3 * current.a + _2_SQRT3 * current.b;
+	}
+	else
+	{
+		float mid = (1.0f / 3) * (current.a + current.b + current.c);
+		float a = current.a - mid;
+		float b = current.b - mid;
+		i_alpha = a;
+		i_beta = _1_SQRT3 * a + _2_SQRT3 * b;
+	}
+
 	ct = _cos(angle_el);
 	st = _sin(angle_el);
 	ret.d = i_alpha * ct + i_beta * st;

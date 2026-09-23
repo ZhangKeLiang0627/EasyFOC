@@ -25,6 +25,7 @@ extern float current_limit;
 void Motor_init(void);
 void Motor_initFOC(float zero_electric_offset, Direction _sensor_direction);
 void loopFOC(void);
+void loopFOCISR(void); // 20kHz 中断版电流环：读注入组采样，固定 dt，去 printf
 void move(float new_target);
 void setPhaseVoltage(float Uq, float Ud, float angle_el);
 // void setPwm(float Ua, float Ub, float Uc);

@@ -19,6 +19,7 @@ extern PIDController PID_current_q, PID_current_d, PID_velocity, P_angle;
 /******************************************************************************/
 void PID_init(void);
 float PIDoperator(PIDController *PID, float error);
+float PIDoperator_dt(PIDController *PID, float error, float Ts); // 固定采样周期版本（中断里用，不读SysTick）
 /******************************************************************************/
 
 #endif

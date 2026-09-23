@@ -77,3 +77,18 @@ PhaseCurrent_s getPhaseCurrents(void)
 	return current;
 }
 /******************************************************************************/
+// 中断版电流采样：直接读注入组 JDR1/JDR2（TIM3 下溢中断里已由 MyADC_StartInjected 触发转换）。
+// 相比 analogRead 的「软件触发+阻塞等EOC」，此函数零阻塞、零轮询，且采样点由 PWM 零矢量时刻对齐。
+PhaseCurrent_s getPhaseCurrentsISR(void)
+{
+	PhaseCurrent_s current;
+	float va = (float)MyADC_GetInjectedValue1() * 3.3f / 4096;
+	float vb = (float)MyADC_GetInjectedValue2() * 3.3f / 4096;
+
+	current.a = (va - offset_ia) * gain_a;											  // amps
+	current.b = (vb - offset_ib) * gain_b;											  // amps
+	current.c = (!_isset(pinC)) ? 0 : 0;											  // 本项目无 C 相采样
+
+	return current;
+}
+/******************************************************************************/
