@@ -7,12 +7,9 @@
 #include "led.h"
 #include "BEEPER.h"
 #include "oled.h"
-#include "multi_button_user.h"
-#include "multi_button.h"
-#include "AS5600.h"
-#include "AS5047P.h"
 #include "MyADC.h"
-#include "Random.h"
+#include "multi_button.h"
+#include "multi_button_user.h"
 
 #include "u8g2.h"
 #include "u8g2_Init.h"
@@ -93,7 +90,7 @@ int main(void)
 	Oled_u8g2_ShowUTF8(0, FONT_HEIGHT * 2.5f, "Ready!!!");
 	Oled_u8g2_SendBuffer();
 
-	// xTaskCreate((TaskFunction_t)led0_task, "led0_task", 64, NULL, 2, &LED0Task_Handler);
+	xTaskCreate((TaskFunction_t)led0_task, "led0_task", 64, NULL, 2, &LED0Task_Handler);
 	xTaskCreate((TaskFunction_t)OledRefresh_task, "OledRefresh_task", 512, NULL, 6, &OledRefreshTask_Handler);
 	xTaskCreate((TaskFunction_t)CommanderProc_task, "CommanderProc_task", 512, NULL, 6, &CommanderProcTask_Handler);
 	xTaskCreate((TaskFunction_t)KeyProc_task, "KeyProc_task", 512, NULL, 6, &KeyProcTask_Handler);
@@ -365,7 +362,7 @@ void CommanderProc_task(void *pvParameters)
 
 		__IntervalExecute(printf("[System] Voltage = %.2f\r\n", BatteryVoltage), 5000);
 
-		vTaskDelayUntil(&xLastWakeTime, 10);
+		vTaskDelayUntil(&xLastWakeTime, 20);
 	}
 }
 
@@ -405,7 +402,7 @@ void FOCLoop_task(void *pvParameters)
 	while (1)
 	{
 		// 获取实时角度
-		__IntervalExecute(angle = getAngle(), 100);
+		__IntervalExecute(angle = getAngle(), 500);
 
 		// 循环执行FOC控制算法
 		move(target);
