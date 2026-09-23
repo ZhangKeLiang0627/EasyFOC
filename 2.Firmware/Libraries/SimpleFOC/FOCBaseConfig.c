@@ -133,18 +133,20 @@ void EasyFOC_Init(void)
 	controller = Type_velocity;		  // Type_angle; //Type_torque; //Type_velocity
 	pole_pairs = 11;				  // 电机极对数，3505电机+AS5047P为11；虽然可以上电检测但有失败的概率
 
-	PID_velocity.P = 0.11f; // 速度环PI参数，只用P参数方便快速调试
+	// 位置环
+	P_angle.P = 20.0f; 				  // 位置环参数，只需P参数，一般不需要改动
+
+	// 速度环
+	PID_velocity.P = 0.11f; 		  // 速度环PI参数，只用P参数方便快速调试
 	PID_velocity.I = 0.98f;
-
-	P_angle.P = 20.0f; // 位置环参数，只需P参数，一般不需要改动
-
-	PID_current_d.P = 0.2f; // 电流环PI参数，可以进入 PID_init() 函数中修改其它参数
-	PID_current_d.I = 0;	// 电流环I参数不太好调试，设置为0只用P参数也可以
-	PID_current_q.P = 3.0f; // 电流环P单位=欧姆(≈相电阻)，保守初值3，运行时用 Q 命令调
-	PID_current_q.I = 50.0f; // 电流环I单位=欧姆/秒，保守初值50消除稳态误差，运行时用 W 命令慢慢加
-
-	PID_velocity.output_ramp = 0; // 速度爬升斜率，如果不需要可以设置为0
+	PID_velocity.output_ramp = 0.0f;  // 速度爬升斜率，如果不需要可以设置为0
 	LPF_velocity.Tf = 0.01f;
+
+	// 电流环
+	PID_current_d.P = 0.0f; 		  // 电流环PI参数，可以进入 PID_init() 函数中修改其它参数
+	PID_current_d.I = 0.0f;			  // 电流环I参数不太好调试，设置为0只用P参数也可以
+	PID_current_q.P = 3.0f; 		  // 电流环P单位=欧姆(≈相电阻)，保守初值3，运行时用 Q 命令调
+	PID_current_q.I = 50.0f; 		  // 电流环I单位=欧姆/秒，保守初值50消除稳态误差，运行时用 W 命令慢慢加
 
 	Motor_init();
 	Motor_initFOC(1.3760f, CW); // 已校准：提供偏移角和方向，开机跳过零点校准（不转电机）
@@ -157,8 +159,6 @@ void EasyFOC_Init(void)
 #include "CommonMacro.h"
 
 uint32_t Led_count = 0;
-
-extern float target; // 上电后以 x rad/s的转速转动(x 圈/秒)
 
 void TIM1_UP_TIM10_IRQHandler(void)
 {
