@@ -145,8 +145,8 @@ void EasyFOC_Init(void)
 	// 电流环
 	PID_current_d.P = 0.0f; 		  // 电流环PI参数，可以进入 PID_init() 函数中修改其它参数
 	PID_current_d.I = 0.0f;			  // 电流环I参数不太好调试，设置为0只用P参数也可以
-	PID_current_q.P = 3.0f; 		  // 电流环P单位=欧姆(≈相电阻)，保守初值3，运行时用 Q 命令调
-	PID_current_q.I = 50.0f; 		  // 电流环I单位=欧姆/秒，保守初值50消除稳态误差，运行时用 W 命令慢慢加
+	PID_current_q.P = 1.2f; 		  // 电流环P单位=欧姆(≈相电阻)，保守初值3，运行时用 Q 命令调
+	PID_current_q.I = 75.0f; 		  // 电流环I单位=欧姆/秒，保守初值50消除稳态误差，运行时用 W 命令慢慢加
 
 	Motor_init();
 	Motor_initFOC(1.3760f, CW); // 已校准：提供偏移角和方向，开机跳过零点校准（不转电机）
