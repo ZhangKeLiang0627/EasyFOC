@@ -95,7 +95,7 @@ int main(void)
 	xTaskCreate((TaskFunction_t)CommanderProc_task, "CommanderProc_task", 512, NULL, 6, &CommanderProcTask_Handler);
 	xTaskCreate((TaskFunction_t)KeyProc_task, "KeyProc_task", 512, NULL, 6, &KeyProcTask_Handler);
 	xTaskCreate((TaskFunction_t)BeepProc_task, "BeepProc_task", 512, NULL, 6, &BeepProcTask_Handler);
-	xTaskCreate((TaskFunction_t)FOCLoop_task, "FOCLoop_task", 512, NULL, 6, &FOCLoopTask_Handler);
+	xTaskCreate((TaskFunction_t)FOCLoop_task, "FOCLoop_task", 512, NULL, 8, &FOCLoopTask_Handler);
 
 	vTaskStartScheduler(); // 开启任务调度
 
@@ -342,7 +342,14 @@ void OledRefresh_task(void *pvParameters)
 
 	while (1)
 	{
+		// 获取实时角度
+		__IntervalExecute(angle = getAngle(), 1000);
+		
 		Oled_Refresh();
+
+		__IntervalExecute(BatteryVoltage = getBetteryVolt() * 6.0f, 5000);
+
+		__IntervalExecute(printf("[System] Voltage = %.2f\r\n", BatteryVoltage), 5000);
 
 		// every Oled refersh task need at least 200ms delay otherwise cannot control motor normally
 		vTaskDelayUntil(&xLastWakeTime, 1000);
@@ -358,9 +365,6 @@ void CommanderProc_task(void *pvParameters)
 	{
 		Commander_Proc();
 
-		__IntervalExecute(BatteryVoltage = getBetteryVolt() * 6.0f, 5000);
-
-		__IntervalExecute(printf("[System] Voltage = %.2f\r\n", BatteryVoltage), 5000);
 
 		vTaskDelayUntil(&xLastWakeTime, 20);
 	}
@@ -401,9 +405,6 @@ void FOCLoop_task(void *pvParameters)
 
 	while (1)
 	{
-		// 获取实时角度
-		__IntervalExecute(angle = getAngle(), 500);
-
 		// 循环执行FOC控制算法
 		move(target);
 		loopFOC();
