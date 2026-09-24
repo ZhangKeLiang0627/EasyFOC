@@ -266,6 +266,29 @@ void Commander_Proc(void)
 		}
 		break;
 
+		case 'R': // R  读电流环内部状态（current_sp / current.q / voltage.q），用于调试电流环
+			printf("[R] sp=%.3f Iq=%.3f Id=%.3f | Vq=%.3f Vd=%.3f\r\n",
+				   current_sp, current.q, current.d, voltage.q, voltage.d);
+			break;
+
+		case 'J': // J  诊断注入组：触发后延时读 JDR1-4，对比规则组
+		{
+			volatile uint32_t d;
+			ADC_ClearFlag(ADC1, ADC_FLAG_JEOC);
+			ADC_SoftwareStartInjectedConv(ADC1);
+			for (d = 0; d < 100000; d++)
+				; // 延时足够长，确保 2 个注入通道都转换完
+			printf("[J] SR=0x%lX JDR1=%u JDR2=%u JDR3=%u JDR4=%u | rawA=%u rawB=%u\r\n",
+				   (unsigned long)ADC1->SR,
+				   (unsigned int)ADC_GetInjectedConversionValue(ADC1, ADC_InjectedChannel_1),
+				   (unsigned int)ADC_GetInjectedConversionValue(ADC1, ADC_InjectedChannel_2),
+				   (unsigned int)ADC_GetInjectedConversionValue(ADC1, ADC_InjectedChannel_3),
+				   (unsigned int)ADC_GetInjectedConversionValue(ADC1, ADC_InjectedChannel_4),
+				   (unsigned int)analogRead(ADC_SENSE_A),
+				   (unsigned int)analogRead(ADC_SENSE_B));
+		}
+		break;
+
 		case 'E': // E 电机使能，U -> PowerUP使能 / D -> PowerDown失能
 			switch (USART6_RX_BUF[1])
 			{

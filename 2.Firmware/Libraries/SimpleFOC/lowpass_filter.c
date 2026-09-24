@@ -6,11 +6,11 @@ LowPassFilter LPF_current_q, LPF_current_d, LPF_velocity;
 /******************************************************************************/
 void LPF_init(void)
 {
-	LPF_current_q.Tf = 0.02f;
+	LPF_current_q.Tf = 0.001f; // 电流环反馈LPF，20kHz采样下Tf=1ms(截止~160Hz)，之前0.02(8Hz)滞后过大致震荡
 	LPF_current_q.y_prev = 0;
 	LPF_current_q.timestamp_prev = _micros();
 
-	LPF_current_d.Tf = 0.02f;
+	LPF_current_d.Tf = 0.001f;
 	LPF_current_d.y_prev = 0;
 	LPF_current_d.timestamp_prev = _micros();
 

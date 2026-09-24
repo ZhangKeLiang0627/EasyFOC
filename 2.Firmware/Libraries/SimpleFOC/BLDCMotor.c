@@ -194,10 +194,9 @@ void loopFOC(void)
 	setPhaseVoltage(voltage.q, voltage.d, electrical_angle);
 }
 /******************************************************************************/
-// 20kHz 中断版电流环（TIM3 下溢中断里调用）
+// 20kHz 中断版电流环（TIM10 更新中断里调用）
 // 与原 loopFOC() 的差异：
-//   1. 采样用「注入组 + MyADC_StartInjected」，先启动转换，再读角（SPI 阻塞期间 ADC 并行转换），
-//      最后读 JDR，零阻塞、采样点与 PWM 零矢量对齐（由 TIM3 下溢中断保证）；
+//   1. 采样改用规则组 analogRead（注入组 JDR2 有硬件坑已弃用，见 getPhaseCurrentsISR 注释）；
 //   2. PID/LPF 用固定 dt 版本（FOC_ISR_TS = 50us），不读 SysTick（高优先级中断里 SysTick 被挂起）；
 //   3. 去掉 printf（中断里禁止），default 分支静默。
 void loopFOCISR(void)
@@ -209,10 +208,7 @@ void loopFOCISR(void)
 	if (controller == Type_angle_openloop || controller == Type_velocity_openloop)
 		return;
 
-	// 1. 启动注入组转换（CH14/CH15 依次转换，约 2.6us，与下面 SPI 读角并行）
-	MyADC_StartInjected();
-
-	// 2. 读角度（SPI 阻塞约 2-3us，期间 ADC 注入组并行转换）
+	// 读角度（SPI 阻塞约 2-3us）
 	shaft_angle = shaftAngle();			  // shaft angle
 	electrical_angle = electricalAngle(); // electrical angle - need shaftAngle to be called first
 
@@ -221,9 +217,7 @@ void loopFOCISR(void)
 	case Type_voltage: // no need to do anything really
 		break;
 	case Type_dc_current:
-		// 等注入组转换完成（通常此时已转换完，几乎不阻塞，仅作兜底）
-		while (!ADC_GetFlagStatus(ADC1, ADC_FLAG_JEOC));
-		// read overall current magnitude
+		// read overall current magnitude（规则组 analogRead 采样）
 		current.q = getDCCurrentISR(electrical_angle);
 		// filter the value values
 		current.q = LPFoperator_dt(&LPF_current_q, current.q, FOC_ISR_TS);
@@ -232,9 +226,7 @@ void loopFOCISR(void)
 		voltage.d = 0;
 		break;
 	case Type_foc_current:
-		// 等注入组转换完成
-		while (!ADC_GetFlagStatus(ADC1, ADC_FLAG_JEOC));
-		// read dq currents
+		// read dq currents（规则组 analogRead 采样）
 		current = getFOCCurrentsISR(electrical_angle);
 		// filter values
 		current.q = LPFoperator_dt(&LPF_current_q, current.q, FOC_ISR_TS);
