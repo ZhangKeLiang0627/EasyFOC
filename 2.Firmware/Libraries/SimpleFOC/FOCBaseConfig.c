@@ -9,7 +9,6 @@ void TIM3_PWM_Init(u16 arr)
 	/*初始化结构体*/
 	TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStructure;
 	TIM_OCInitTypeDef TIM_OCInitStructure;
-	NVIC_InitTypeDef NVIC_InitStructure;
 
 	/*开启rcc时钟*/
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
@@ -41,44 +40,40 @@ void TIM3_PWM_Init(u16 arr)
 
 	TIM_CtrlPWMOutputs(TIM3, ENABLE);
 
-	/* 配置 TIM3 更新中断（20kHz 电流环载体）。
-	 * 注意：此处只配 NVIC、不使能中断；中断必须等 EasyFOC_Init 全部完成
-	 * （编码器已 init、电流偏移已校准、Motor_initFOC 已跑完）后再使能，
-	 * 否则中断会在 _GetRawAngle 函数指针赋值前触发，getAngle() 调空指针 HardFault。 */
-	NVIC_InitStructure.NVIC_IRQChannel = TIM3_IRQn;
-	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1; // 高于 FreeRTOS 上限(5)，且中断内不调 FreeRTOS API
-	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
-	NVIC_Init(&NVIC_InitStructure);
-	// TIM_ITConfig(TIM3, TIM_IT_Update, ENABLE); // 延迟到 EasyFOC_Init 末尾使能
+	/* TIM3 只做 PWM 输出（20kHz 中心对齐开关频率），不再用作中断源。
+	 * 20kHz 电流环中断改由 TIM10 承担（见 TIM10_FOC_Init）。 */
 
 	TIM_Cmd(TIM3, ENABLE);
 }
 
-/* TIM10定时中断1ms */
-void TIM10_Count_Init(void)
+/* TIM10 定时中断 20kHz（电流环载体）。
+ * TIM10 挂 APB2（84MHz），边沿对齐（Up）模式：84MHz / (ARR+1) = 20kHz -> ARR = 4199。
+ * 用 Up 模式而非中心对齐，更新中断频率无歧义（中心对齐下 Update 事件可能上下溢各触发一次）。
+ * 中断优先级 1（高于 FreeRTOS 上限 5），且中断内不调 FreeRTOS API。 */
+void TIM10_FOC_Init(void)
 {
-	TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStruture;
+	TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStructure;
 	NVIC_InitTypeDef NVIC_InitStructure;
 
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM10, ENABLE);
 
-	TIM_TimeBaseInitStruture.TIM_ClockDivision = TIM_CKD_DIV1;
-	TIM_TimeBaseInitStruture.TIM_CounterMode = TIM_CounterMode_Up;
-	TIM_TimeBaseInitStruture.TIM_Period = 8400 - 1;	 // ARR = 8400 - 1	// 1ms
-	TIM_TimeBaseInitStruture.TIM_Prescaler = 10 - 1; // RSC = 10 - 1
-	TIM_TimeBaseInitStruture.TIM_RepetitionCounter = 0;
-	TIM_TimeBaseInit(TIM10, &TIM_TimeBaseInitStruture);
+	TIM_TimeBaseInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
+	TIM_TimeBaseInitStructure.TIM_CounterMode = TIM_CounterMode_Up; // 边沿对齐，中断频率无歧义
+	TIM_TimeBaseInitStructure.TIM_Period = 4200 - 1;				 // ARR = 4199 -> 84MHz/4200 = 20kHz
+	TIM_TimeBaseInitStructure.TIM_Prescaler = 1 - 1;				 // PSC = 0
+	TIM_TimeBaseInitStructure.TIM_RepetitionCounter = 0;
+	TIM_TimeBaseInit(TIM10, &TIM_TimeBaseInitStructure);
 
 	TIM_ClearFlag(TIM10, TIM_FLAG_Update);
 
-	TIM_ITConfig(TIM10, TIM_IT_Update, ENABLE);
-
 	NVIC_InitStructure.NVIC_IRQChannel = TIM1_UP_TIM10_IRQn;
 	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 7;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1; // 高于 FreeRTOS 上限(5)，且中断内不调 FreeRTOS API
 	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
 	NVIC_Init(&NVIC_InitStructure);
+
+	// 中断使能延迟到 EasyFOC_Init 末尾（编码器/电流偏移/零点就绪后），见 EasyFOC_Init
+	// TIM_ITConfig(TIM10, TIM_IT_Update, ENABLE);
 
 	TIM_Cmd(TIM10, ENABLE);
 }
@@ -166,40 +161,24 @@ void EasyFOC_Init(void)
 
 	// TIM10_Count_Init(); // interrupt per 1ms
 
-	// 到这里编码器/电流偏移/零点都已就绪，才使能 20kHz 电流环中断（见 TIM3_PWM_Init 注释）
+	// 到这里编码器/电流偏移/零点都已就绪，才使能 20kHz 电流环中断（TIM10，见 TIM10_FOC_Init 注释）
 	// 中断使能前再确保一次 DWT 计时已使能（main 早期调用可能因调试器时序被吞，这里兜底）
 	DWT_Init();
-	TIM_ClearFlag(TIM3, TIM_FLAG_Update);
-	TIM_ITConfig(TIM3, TIM_IT_Update, ENABLE);
+	TIM10_FOC_Init();
+	TIM_ClearFlag(TIM10, TIM_FLAG_Update);
+	TIM_ITConfig(TIM10, TIM_IT_Update, ENABLE);
 
 	printf("EasyFOC Init is OK!\r\nMotor is ready.\r\n");
 }
 
 #include "CommonMacro.h"
 
-uint32_t Led_count = 0;
-
+// 20kHz 电流环中断：由 TIM10 更新中断触发（TIM3 已专职 PWM 输出）
 void TIM1_UP_TIM10_IRQHandler(void)
 {
 	if (TIM_GetITStatus(TIM10, TIM_IT_Update) == SET)
 	{
 		TIM_ClearITPendingBit(TIM10, TIM_IT_Update);
-
-		// Led每500ms反转一次
-		if (++Led_count > 500)
-		{
-			LED0 = !LED0;
-			Led_count = 0;
-		}
-	}
-}
-
-// 20kHz 电流环中断：中心对齐模式下溢（零矢量）时刻触发
-void TIM3_IRQHandler(void)
-{
-	if (TIM_GetITStatus(TIM3, TIM_IT_Update) == SET)
-	{
-		TIM_ClearITPendingBit(TIM3, TIM_IT_Update);
 		loopFOCISR();
 	}
 }
