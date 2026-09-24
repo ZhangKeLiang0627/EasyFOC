@@ -61,18 +61,21 @@ void user_keyBSP_init(void)
 #endif
 }
 
-uint8_t read_key0_gpio(void)
+uint8_t read_key0_gpio(uint8_t button_id)
 {
+	(void)button_id;
 	return GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_0);
 }
 
-uint8_t read_key1_gpio(void)
+uint8_t read_key1_gpio(uint8_t button_id)
 {
+	(void)button_id;
 	return GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_1);
 }
 
-uint8_t read_key2_gpio(void)
+uint8_t read_key2_gpio(uint8_t button_id)
 {
+	(void)button_id;
 	return GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_2);
 }
 
