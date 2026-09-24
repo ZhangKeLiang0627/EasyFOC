@@ -8,3 +8,6 @@
 2.Firmware/USER/.vscode/settings.json
 2.Firmware/USER/.vscode/uv4.log
 2.Firmware/USER/.vscode/uv4.log.lock
+# 自动化闭环调试产物（close_loop.py 生成/使用，不入库）
+2.Firmware/USER/build_loop.log
+2.Firmware/USER/STM32F4xx_DFP.zip
