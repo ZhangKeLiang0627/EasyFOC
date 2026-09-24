@@ -31,7 +31,7 @@ extern uint8_t USART6_Recive_flag;
 // DWT 计时统计（loopFOCISR 单次执行耗时，定义在 BLDCMotor.c，单位 CPU 周期 @84MHz）
 extern uint32_t foc_cycles_min;
 extern uint32_t foc_cycles_max;
-extern uint32_t foc_cycles_sum;
+extern uint64_t foc_cycles_sum;
 extern uint32_t foc_cycles_cnt;
 
 // 任务句柄

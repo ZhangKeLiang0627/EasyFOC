@@ -17,7 +17,7 @@ float current_limit;
 // DWT 计时统计（loopFOCISR 单次执行耗时，单位 CPU 周期 @84MHz）
 uint32_t foc_cycles_min = 0xFFFFFFFF;
 uint32_t foc_cycles_max = 0;
-uint32_t foc_cycles_sum = 0;
+uint64_t foc_cycles_sum = 0; // uint64：20kHz 下约 152s 就会让 uint32 溢出回绕，导致 avg 显示假数据
 uint32_t foc_cycles_cnt = 0;
 /******************************************************************************/
 int alignSensor(void);
