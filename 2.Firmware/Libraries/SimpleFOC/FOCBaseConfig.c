@@ -1,6 +1,7 @@
 #include "FOCBaseConfig.h"
 #include "FOCuser_Inc.h"
 #include "led.h"
+#include "delay.h"
 
 /* FOC电机控制PWM初始化 */
 void TIM3_PWM_Init(u16 arr)
@@ -166,6 +167,8 @@ void EasyFOC_Init(void)
 	// TIM10_Count_Init(); // interrupt per 1ms
 
 	// 到这里编码器/电流偏移/零点都已就绪，才使能 20kHz 电流环中断（见 TIM3_PWM_Init 注释）
+	// 中断使能前再确保一次 DWT 计时已使能（main 早期调用可能因调试器时序被吞，这里兜底）
+	DWT_Init();
 	TIM_ClearFlag(TIM3, TIM_FLAG_Update);
 	TIM_ITConfig(TIM3, TIM_IT_Update, ENABLE);
 

@@ -234,6 +234,10 @@ void Commander_Proc(void)
 
 		case 'D': // D  打印 loopFOCISR 执行耗时统计（DWT CYCCNT，@84MHz，1周期=11.9ns）
 		{
+			// 只读 DWT 状态（确认使能是否生效）
+			printf("[D] DWT state: DEMCR=0x%lX CTRL=0x%lX\r\n",
+				   (unsigned long)CoreDebug->DEMCR,
+				   (unsigned long)DWT->CTRL);
 			float avg = (foc_cycles_cnt) ? (float)foc_cycles_sum / foc_cycles_cnt : 0.0f;
 			printf("[D] loopFOCISR cycles: min=%lu max=%lu avg=%.1f cnt=%lu\r\n",
 				   (unsigned long)foc_cycles_min, (unsigned long)foc_cycles_max, avg, (unsigned long)foc_cycles_cnt);

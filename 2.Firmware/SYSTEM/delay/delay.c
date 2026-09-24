@@ -110,8 +110,10 @@ uint32_t millis(void)
 void DWT_Init(void)
 {
 	CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk; // 使能 DWT 跟踪单元
+	__DSB();										// 确保写完成（调试寄存器写需内存屏障）
 	DWT->CYCCNT = 0;
 	DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk; // 使能周期计数器
+	__DSB();
 }
 
 // 读取当前周期计数（除以 CPU 主频即为微秒）
