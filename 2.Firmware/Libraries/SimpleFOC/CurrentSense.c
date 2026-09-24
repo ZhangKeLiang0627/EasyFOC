@@ -40,7 +40,7 @@ float getDCCurrent(float motor_electrical_angle)
 	return sign * _sqrt(i_alpha * i_alpha + i_beta * i_beta);
 }
 /******************************************************************************/
-// 中断版：与 getDCCurrent 相同，但内部改用 getPhaseCurrentsISR（读注入组，非阻塞）
+// 中断版 getDCCurrent：内部用 getPhaseCurrentsISR
 float getDCCurrentISR(float motor_electrical_angle)
 {
 	PhaseCurrent_s current;
@@ -107,7 +107,7 @@ DQCurrent_s getFOCCurrents(float angle_el)
 	return ret;
 }
 /******************************************************************************/
-// 中断版：与 getFOCCurrents 相同，但内部改用 getPhaseCurrentsISR（读注入组，非阻塞）
+// 中断版 getFOCCurrents：内部用 getPhaseCurrentsISR
 DQCurrent_s getFOCCurrentsISR(float angle_el)
 {
 	PhaseCurrent_s current;

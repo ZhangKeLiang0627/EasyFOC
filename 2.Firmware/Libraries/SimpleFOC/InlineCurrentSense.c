@@ -77,10 +77,7 @@ PhaseCurrent_s getPhaseCurrents(void)
 	return current;
 }
 /******************************************************************************/
-// 中断版电流采样：改用规则组 analogRead 采样。
-// 弃用注入组原因：注入组 JDR2（B相）在静止态恒读 0，导致 B 相电流虚高（current.b≈-3.3A），
-// 电流环误判「电流过大」把 Vq 压到限幅、电机堵转震荡。规则组经验证采样正确（静止 Iq=0），
-// 故这里直接复用 getPhaseCurrents()（规则组，analogRead 软件触发 + 阻塞等 EOC）。
+// 中断版电流采样：规则组 analogRead（注入组 JDR2 恒 0 已弃用）
 PhaseCurrent_s getPhaseCurrentsISR(void)
 {
 	return getPhaseCurrents();

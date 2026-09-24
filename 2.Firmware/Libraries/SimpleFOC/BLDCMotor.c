@@ -14,12 +14,6 @@ unsigned long open_loop_timestamp;
 float velocity_limit;
 float current_limit;
 /******************************************************************************/
-// DWT 计时统计（loopFOCISR 单次执行耗时，单位 CPU 周期 @84MHz）
-uint32_t foc_cycles_min = 0xFFFFFFFF;
-uint32_t foc_cycles_max = 0;
-uint64_t foc_cycles_sum = 0; // uint64：20kHz 下约 152s 就会让 uint32 溢出回绕，导致 avg 显示假数据
-uint32_t foc_cycles_cnt = 0;
-/******************************************************************************/
 int alignSensor(void);
 float velocityOpenloop(float target_velocity);
 float angleOpenloop(float target_angle);
@@ -194,63 +188,36 @@ void loopFOC(void)
 	setPhaseVoltage(voltage.q, voltage.d, electrical_angle);
 }
 /******************************************************************************/
-// 20kHz 中断版电流环（TIM10 更新中断里调用）
-// 与原 loopFOC() 的差异：
-//   1. 采样改用规则组 analogRead（注入组 JDR2 有硬件坑已弃用，见 getPhaseCurrentsISR 注释）；
-//   2. PID/LPF 用固定 dt 版本（FOC_ISR_TS = 50us），不读 SysTick（高优先级中断里 SysTick 被挂起）；
-//   3. 去掉 printf（中断里禁止），default 分支静默。
+// 20kHz 中断版电流环（TIM10 更新中断触发），PID/LPF 用固定 dt = FOC_ISR_TS，中断内禁止 printf
 void loopFOCISR(void)
 {
-	uint32_t t0, t1, dt;
-
-	t0 = DWT_GetCycle(); // 计时起点
-
 	if (controller == Type_angle_openloop || controller == Type_velocity_openloop)
 		return;
 
-	// 读角度（SPI 阻塞约 2-3us）
-	shaft_angle = shaftAngle();			  // shaft angle
-	electrical_angle = electricalAngle(); // electrical angle - need shaftAngle to be called first
+	shaft_angle = shaftAngle();
+	electrical_angle = electricalAngle();
 
 	switch (torque_controller)
 	{
-	case Type_voltage: // no need to do anything really
+	case Type_voltage:
 		break;
 	case Type_dc_current:
-		// read overall current magnitude（规则组 analogRead 采样）
 		current.q = getDCCurrentISR(electrical_angle);
-		// filter the value values
 		current.q = LPFoperator_dt(&LPF_current_q, current.q, FOC_ISR_TS);
-		// calculate the phase voltage
 		voltage.q = PIDoperator_dt(&PID_current_q, (current_sp - current.q), FOC_ISR_TS);
 		voltage.d = 0;
 		break;
 	case Type_foc_current:
-		// read dq currents（规则组 analogRead 采样）
 		current = getFOCCurrentsISR(electrical_angle);
-		// filter values
 		current.q = LPFoperator_dt(&LPF_current_q, current.q, FOC_ISR_TS);
 		current.d = LPFoperator_dt(&LPF_current_d, current.d, FOC_ISR_TS);
-		// calculate the phase voltages
 		voltage.q = PIDoperator_dt(&PID_current_q, (current_sp - current.q), FOC_ISR_TS);
 		voltage.d = PIDoperator_dt(&PID_current_d, -current.d, FOC_ISR_TS);
 		break;
 	default:
-		// 中断里禁止 printf，静默处理
 		break;
 	}
-	// set the phase voltage - FOC heart function :)
 	setPhaseVoltage(voltage.q, voltage.d, electrical_angle);
-
-	// 计时统计
-	t1 = DWT_GetCycle();
-	dt = t1 - t0;
-	if (dt < foc_cycles_min)
-		foc_cycles_min = dt;
-	if (dt > foc_cycles_max)
-		foc_cycles_max = dt;
-	foc_cycles_sum += dt;
-	foc_cycles_cnt++;
 }
 /******************************************************************************/
 void move(float new_target)

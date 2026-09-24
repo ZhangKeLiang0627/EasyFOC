@@ -28,12 +28,6 @@ float angle;
 float BatteryVoltage;
 extern uint8_t USART6_Recive_flag;
 
-// DWT 计时统计（loopFOCISR 单次执行耗时，定义在 BLDCMotor.c，单位 CPU 周期 @84MHz）
-extern uint32_t foc_cycles_min;
-extern uint32_t foc_cycles_max;
-extern uint64_t foc_cycles_sum;
-extern uint32_t foc_cycles_cnt;
-
 // 任务句柄
 TaskHandle_t LED0Task_Handler;
 TaskHandle_t OledRefreshTask_Handler;
@@ -61,7 +55,6 @@ int main(void)
 
 	// 初始化延时函数
 	delay_init(84);
-	DWT_Init(); // 使能 DWT 周期计数器，用于测量 loopFOC 执行时间
 
 	// 初始化串口（波特率）
 	USART6_Init(115200);
@@ -232,25 +225,6 @@ void Commander_Proc(void)
 			printf("Vel=%.2f\r\n", shaft_velocity);
 			break;
 
-		case 'D': // D  打印 loopFOCISR 执行耗时统计（DWT CYCCNT，@84MHz，1周期=11.9ns）
-		{
-			// 只读 DWT 状态（确认使能是否生效）
-			printf("[D] DWT state: DEMCR=0x%lX CTRL=0x%lX\r\n",
-				   (unsigned long)CoreDebug->DEMCR,
-				   (unsigned long)DWT->CTRL);
-			float avg = (foc_cycles_cnt) ? (float)foc_cycles_sum / foc_cycles_cnt : 0.0f;
-			printf("[D] loopFOCISR cycles: min=%lu max=%lu avg=%.1f cnt=%lu\r\n",
-				   (unsigned long)foc_cycles_min, (unsigned long)foc_cycles_max, avg, (unsigned long)foc_cycles_cnt);
-			printf("[D] loopFOCISR time:   min=%.2fus max=%.2fus avg=%.2fus\r\n",
-				   foc_cycles_min / 84.0f, foc_cycles_max / 84.0f, avg / 84.0f);
-			// 复位统计
-			foc_cycles_min = 0xFFFFFFFF;
-			foc_cycles_max = 0;
-			foc_cycles_sum = 0;
-			foc_cycles_cnt = 0;
-		}
-		break;
-
 		case 'A': // A  读绝对角度
 			printf("Ang=%.2f\r\n", shaft_angle);
 			break;
@@ -270,24 +244,6 @@ void Commander_Proc(void)
 			printf("[R] sp=%.3f Iq=%.3f Id=%.3f | Vq=%.3f Vd=%.3f\r\n",
 				   current_sp, current.q, current.d, voltage.q, voltage.d);
 			break;
-
-		case 'J': // J  诊断注入组：触发后延时读 JDR1-4，对比规则组
-		{
-			volatile uint32_t d;
-			ADC_ClearFlag(ADC1, ADC_FLAG_JEOC);
-			ADC_SoftwareStartInjectedConv(ADC1);
-			for (d = 0; d < 100000; d++)
-				; // 延时足够长，确保 2 个注入通道都转换完
-			printf("[J] SR=0x%lX JDR1=%u JDR2=%u JDR3=%u JDR4=%u | rawA=%u rawB=%u\r\n",
-				   (unsigned long)ADC1->SR,
-				   (unsigned int)ADC_GetInjectedConversionValue(ADC1, ADC_InjectedChannel_1),
-				   (unsigned int)ADC_GetInjectedConversionValue(ADC1, ADC_InjectedChannel_2),
-				   (unsigned int)ADC_GetInjectedConversionValue(ADC1, ADC_InjectedChannel_3),
-				   (unsigned int)ADC_GetInjectedConversionValue(ADC1, ADC_InjectedChannel_4),
-				   (unsigned int)analogRead(ADC_SENSE_A),
-				   (unsigned int)analogRead(ADC_SENSE_B));
-		}
-		break;
 
 		case 'E': // E 电机使能，U -> PowerUP使能 / D -> PowerDown失能
 			switch (USART6_RX_BUF[1])

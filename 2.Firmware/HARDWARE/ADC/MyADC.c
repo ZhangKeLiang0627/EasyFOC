@@ -55,15 +55,6 @@ void MyADC_Init(void)
     ADC_Init(ADC1, &ADC_InitStructure);                                         // ADC初始化
 
     ADC_Cmd(ADC1, ENABLE); // 开启AD转换器
-
-    // === 注入组初始化：FOC 电流采样（A相=CH14=PC4, B相=CH15=PC5）===
-    // 注入组与规则组独立，结果存在 JDR1/JDR2，互不覆盖，也互不影响电池电压(规则组CH2)采样。
-    // F401 注入组触发源只有 T3_CC2/T3_CC4（无 T3_TRGO），故用软件启动(MyADC_StartInjected)，
-    // 由 TIM3 中心对齐下溢中断（零矢量时刻）保证采样点对齐、避开开关振铃。
-    ADC_InjectedSequencerLengthConfig(ADC1, 2);
-    ADC_InjectedChannelConfig(ADC1, ADC_Channel_14, 1, ADC_SampleTime_15Cycles); // A相 -> JDR1
-    ADC_InjectedChannelConfig(ADC1, ADC_Channel_15, 2, ADC_SampleTime_15Cycles); // B相 -> JDR2
-    ADC_ClearFlag(ADC1, ADC_FLAG_JEOC);
 }
 
 /**
@@ -150,24 +141,4 @@ float _readADCVoltageInline(unsigned char ch)
 {
     unsigned short raw_adc = analogRead(ch);
     return (float)raw_adc * 3.3f / 4096;
-}
-
-// === 注入组电流采样函数（20kHz 中断里使用）===
-// 软件启动注入组转换：CH14(A相)/CH15(B相) 两个通道自动依次转换，结果进 JDR1/JDR2
-void MyADC_StartInjected(void)
-{
-    ADC_ClearFlag(ADC1, ADC_FLAG_JEOC);
-    ADC_SoftwareStartInjectedConv(ADC1);
-}
-
-// 读 JDR1（A相 = CH14 = PC4）
-uint16_t MyADC_GetInjectedValue1(void)
-{
-    return ADC_GetInjectedConversionValue(ADC1, ADC_InjectedChannel_1);
-}
-
-// 读 JDR2（B相 = CH15 = PC5）
-uint16_t MyADC_GetInjectedValue2(void)
-{
-    return ADC_GetInjectedConversionValue(ADC1, ADC_InjectedChannel_2);
 }

@@ -39,17 +39,10 @@ void TIM3_PWM_Init(u16 arr)
 	TIM_OC4PreloadConfig(TIM3, TIM_OCPreload_Enable);
 
 	TIM_CtrlPWMOutputs(TIM3, ENABLE);
-
-	/* TIM3 只做 PWM 输出（20kHz 中心对齐开关频率），不再用作中断源。
-	 * 20kHz 电流环中断改由 TIM10 承担（见 TIM10_FOC_Init）。 */
-
 	TIM_Cmd(TIM3, ENABLE);
 }
 
-/* TIM10 定时中断 20kHz（电流环载体）。
- * TIM10 挂 APB2（84MHz），边沿对齐（Up）模式：84MHz / (ARR+1) = 20kHz -> ARR = 4199。
- * 用 Up 模式而非中心对齐，更新中断频率无歧义（中心对齐下 Update 事件可能上下溢各触发一次）。
- * 中断优先级 1（高于 FreeRTOS 上限 5），且中断内不调 FreeRTOS API。 */
+// 20kHz 电流环中断源（TIM3 专职 PWM，中断改由 TIM10 承担）
 void TIM10_FOC_Init(void)
 {
 	TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStructure;
@@ -58,7 +51,7 @@ void TIM10_FOC_Init(void)
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM10, ENABLE);
 
 	TIM_TimeBaseInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
-	TIM_TimeBaseInitStructure.TIM_CounterMode = TIM_CounterMode_Up; // 边沿对齐，中断频率无歧义
+	TIM_TimeBaseInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
 	TIM_TimeBaseInitStructure.TIM_Period = 4200 - 1;				 // ARR = 4199 -> 84MHz/4200 = 20kHz
 	TIM_TimeBaseInitStructure.TIM_Prescaler = 1 - 1;				 // PSC = 0
 	TIM_TimeBaseInitStructure.TIM_RepetitionCounter = 0;
@@ -68,11 +61,11 @@ void TIM10_FOC_Init(void)
 
 	NVIC_InitStructure.NVIC_IRQChannel = TIM1_UP_TIM10_IRQn;
 	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1; // 高于 FreeRTOS 上限(5)，且中断内不调 FreeRTOS API
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1; // 高于 FreeRTOS 上限(5)
 	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
 	NVIC_Init(&NVIC_InitStructure);
 
-	// 中断使能延迟到 EasyFOC_Init 末尾（编码器/电流偏移/零点就绪后），见 EasyFOC_Init
+	// 中断使能延迟到 EasyFOC_Init 末尾（见 EasyFOC_Init）
 	// TIM_ITConfig(TIM10, TIM_IT_Update, ENABLE);
 
 	TIM_Cmd(TIM10, ENABLE);
@@ -153,17 +146,15 @@ void EasyFOC_Init(void)
 	// 电流环
 	PID_current_d.P = 0.0f; 		  // 电流环PI参数，可以进入 PID_init() 函数中修改其它参数
 	PID_current_d.I = 0.0f;			  // 电流环I参数不太好调试，设置为0只用P参数也可以
-	PID_current_q.P = 3.0f; 		  // 电流环P单位=欧姆(≈相电阻)。3505相间电阻~6Ω→相-中性~3Ω，P取3
-	PID_current_q.I = 30.0f; 		  // 电流环I单位=欧姆/秒，初值30消除稳态误差，运行时用 W 命令慢慢加
+	PID_current_q.P = 3.0f; 		  // 电流环P单位=欧姆(≈相-中性电阻3Ω)
+	PID_current_q.I = 30.0f; 		  // 电流环I单位=欧姆/秒，运行时用 W 命令慢慢加
 
 	Motor_init();
 	Motor_initFOC(1.3760f, CW); // 已校准：提供偏移角和方向，开机跳过零点校准（不转电机）
 
 	// TIM10_Count_Init(); // interrupt per 1ms
 
-	// 到这里编码器/电流偏移/零点都已就绪，才使能 20kHz 电流环中断（TIM10，见 TIM10_FOC_Init 注释）
-	// 中断使能前再确保一次 DWT 计时已使能（main 早期调用可能因调试器时序被吞，这里兜底）
-	DWT_Init();
+	// 编码器/电流偏移/零点就绪后才使能 20kHz 中断，避免中断早于 initFOC 触发
 	TIM10_FOC_Init();
 	TIM_ClearFlag(TIM10, TIM_FLAG_Update);
 	TIM_ITConfig(TIM10, TIM_IT_Update, ENABLE);
