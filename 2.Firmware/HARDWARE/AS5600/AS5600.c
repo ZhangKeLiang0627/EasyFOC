@@ -9,12 +9,12 @@
 #define IIC_Write_MultiBytes MyIIC_HW_Write_MultiBytes
 #define IIC_Read_MultiBytes  MyIIC_HW_Read_MultiBytes
 #else
-#include "MyIIC2.h"
-#define IIC_Init             MyIIC_Init
-#define IIC_Write_SingleByte MyIIC_Write_SingleByte
-#define IIC_Read_SingleByte  MyIIC_Read_SingleByte
-#define IIC_Write_MultiBytes MyIIC_Write_MultiBytes
-#define IIC_Read_MultiBytes  MyIIC_Read_MultiBytes
+#include "MyIIC_SW.h"
+#define IIC_Init             MyIIC_SW_Init
+#define IIC_Write_SingleByte MyIIC_SW_Write_SingleByte
+#define IIC_Read_SingleByte  MyIIC_SW_Read_SingleByte
+#define IIC_Write_MultiBytes MyIIC_SW_Write_MultiBytes
+#define IIC_Read_MultiBytes  MyIIC_SW_Read_MultiBytes
 #endif
 
 /**

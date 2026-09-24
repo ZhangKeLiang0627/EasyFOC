@@ -17,7 +17,7 @@ extern "C"
 
 /*
  * I2C 驱动方式选择（软/硬二选一，引脚完全一致，无需改硬件）：
- *   0 = 软件 I2C（MyIIC2，GPIO 模拟时序）
+ *   0 = 软件 I2C（MyIIC_SW，GPIO 模拟时序）
  *   1 = 硬件 I2C3（PA8=SCL / PB4=SDA，外设收发，400kHz 快速模式）
  */
 #define AS5600_USE_HW_I2C 0
