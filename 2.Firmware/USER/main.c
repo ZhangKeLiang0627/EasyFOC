@@ -206,20 +206,20 @@ void Oled_Proc(void)
 	Oled_u8g2_SetFont(u8g2_font_5x8_tr);
 
 	// 电流环 P + 角度
-	sprintf(buf, "Pq: %.2f      ANG: %.2f", PID_current_q.P, shaft_angle);
+	sprintf(buf, "Pq: %.2f     ANG: %.2f", PID_current_q.P, shaft_angle);
 	Oled_u8g2_ShowStr(6, 41, buf);
 	// 电流环 I + 目标值
-	sprintf(buf, "Iq: %.2f     TGT: %.2f", PID_current_q.I, target);
+	sprintf(buf, "Iq: %.2f    TGT: %.2f", PID_current_q.I, target);
 	Oled_u8g2_ShowStr(6, 52, buf);
 	// 电流限幅 + 速度
 	sprintf(buf, "LIMT: %.2fA", current_limit);
 	Oled_u8g2_ShowStr(6, 63, buf);
 	sprintf(buf, "%.2frad/s", shaft_velocity);
-	Oled_u8g2_ShowStr(70 + 6, 63, buf);
+	Oled_u8g2_ShowStr(73, 63, buf);
 
 	// 两条竖线
 	Oled_u8g2_DrawBox(0, 34, 2, 30);
-	Oled_u8g2_DrawBox(70, 34, 2, 30);
+	Oled_u8g2_DrawBox(70-5, 34, 2, 30);
 
 	Oled_u8g2_SendBuffer();
 }
