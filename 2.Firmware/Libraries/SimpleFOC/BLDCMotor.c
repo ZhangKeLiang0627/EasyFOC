@@ -38,7 +38,8 @@ void Motor_init(void)
 		PID_velocity.limit = current_limit;
 	P_angle.limit = velocity_limit; // 角度模式的速度限制
 
-	M1_Enable();
+	// M1_Enable();
+	M1_Disable();
 	printf("MOT: Enable driver.\r\n");
 }
 /******************************************************************************/
@@ -77,6 +78,8 @@ int alignSensor(void)
 
 	if (sensor_direction == UNKNOWN) // 没有设置,需要检测
 	{
+		M1_Enable(); // 使能电机开始测试
+
 		// find natural direction
 		// move one electrical revolution forward
 		for (i = 0; i <= 500; i++)

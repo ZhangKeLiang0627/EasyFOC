@@ -72,14 +72,21 @@ uint8_t AS5600_Read_MultiBytes(uint8_t REG_Address, uint8_t BytesNum, uint8_t *b
 uint8_t AS5600_Init(void)
 {
     uint8_t buf[2] = {0};
+    uint8_t st;
 
     /* init i2c interface */
     IIC_Init();
 
     /* 读一次 RAW_ANGLE 检查从机应答；不应答说明接线或上拉有问题 */
-    if (AS5600_Read_MultiBytes(AS5600_RAW_ANGLE_REGISTER1, 2, buf))
+    st = AS5600_Read_MultiBytes(AS5600_RAW_ANGLE_REGISTER1, 2, buf);
+    if (st)
     {
+#if AS5600_USE_HW_I2C
+        printf("[AS5600] I2C read failed: st=%u CR1=0x%04X busy=%u\r\n",
+               st, (unsigned)I2C3->CR1, (unsigned)I2C_GetFlagStatus(I2C3, I2C_FLAG_BUSY));
+#else
         printf("[AS5600] I2C no ACK (addr 0x36)! check SCL=PA8 / SDA=PB4 wiring and pull-up\r\n");
+#endif
         return 1;
     }
 
