@@ -32,7 +32,7 @@ extern uint8_t USART6_Recive_flag;
 
 // ===== 临时波形采集（PID 调参用，@1kHz 采样）=====
 #define SCOPE_N 1000 // 采样点数（@1kHz = 1000ms）
-static float scope_buf[SCOPE_N][4]; // [0]=shaft_velocity [1]=shaft_angle [2]=current_sp [3]=current.q
+static float scope_buf[SCOPE_N][5]; // [0]=shaft_velocity [1]=shaft_angle [2]=current_sp [3]=current.q [4]=voltage.q
 static volatile uint16_t scope_idx = 0;
 static volatile uint8_t scope_state = 0; // 0=空闲 1=采集中 2=待dump
 
@@ -510,8 +510,8 @@ void CommanderProc_task(void *pvParameters)
 			printf("ScopeStart\r\n");
 			for (i = 0; i < SCOPE_N; i++)
 			{
-				printf("%.3f,%.3f,%.3f,%.3f\r\n",
-					   scope_buf[i][0], scope_buf[i][1], scope_buf[i][2], scope_buf[i][3]);
+				printf("%.3f,%.3f,%.3f,%.3f,%.3f\r\n",
+					   scope_buf[i][0], scope_buf[i][1], scope_buf[i][2], scope_buf[i][3], scope_buf[i][4]);
 			}
 			printf("ScopeEnd\r\n");
 			scope_state = 0;
@@ -570,6 +570,7 @@ void FOCLoop_task(void *pvParameters)
 				scope_buf[scope_idx][1] = shaft_angle;
 				scope_buf[scope_idx][2] = current_sp;
 				scope_buf[scope_idx][3] = current.q;
+				scope_buf[scope_idx][4] = voltage.q;
 				scope_idx++;
 			}
 			else
