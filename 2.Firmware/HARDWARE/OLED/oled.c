@@ -5,30 +5,84 @@
 
 u8 OLED_GRAM[128][9];
 
-void I2C_WriteByte(uint8_t addr, uint8_t data)
+// I2C1 硬件配置（初始化与总线恢复后重配共用）
+static void I2C1_HW_Config(void)
+{
+	I2C_InitTypeDef I2C_InitStructure;
+
+	I2C_StructInit(&I2C_InitStructure);
+	I2C_InitStructure.I2C_Ack = I2C_Ack_Enable;
+	I2C_InitStructure.I2C_AcknowledgedAddress = I2C_AcknowledgedAddress_7bit;
+	I2C_InitStructure.I2C_ClockSpeed = I2C_SPEED; // 400Khz//bigger is also ok
+	I2C_InitStructure.I2C_DutyCycle = I2C_DutyCycle_2;
+	I2C_InitStructure.I2C_Mode = I2C_Mode_I2C;
+	I2C_InitStructure.I2C_OwnAddress1 = 0x77; // 主机地址
+
+	I2C_Init(I2C1, &I2C_InitStructure);
+	I2C_Cmd(I2C1, ENABLE);
+}
+
+// I2C1 总线恢复：复位外设并重配（处理 busy/事件标志锁死）
+void I2C1_BusRecover(void)
+{
+	I2C_Cmd(I2C1, DISABLE);
+	RCC_APB1PeriphResetCmd(RCC_APB1Periph_I2C1, ENABLE);
+	RCC_APB1PeriphResetCmd(RCC_APB1Periph_I2C1, DISABLE);
+	I2C1_HW_Config();
+}
+
+// 等待 I2C 事件，超时自动复位总线并返回 1（成功返回 0）
+uint8_t I2C1_WaitEvent(uint32_t event, uint32_t timeout)
+{
+	while (!I2C_CheckEvent(I2C1, event))
+	{
+		if (--timeout == 0)
+		{
+			I2C1_BusRecover();
+			return 1;
+		}
+	}
+	return 0;
+}
+
+// 等待 I2C busy 标志释放，超时自动复位总线并返回 1（成功返回 0）
+uint8_t I2C1_WaitBusyFree(uint32_t timeout)
 {
 	while (I2C_GetFlagStatus(I2C1, I2C_FLAG_BUSY))
-		;
+	{
+		if (--timeout == 0)
+		{
+			I2C1_BusRecover();
+			return 1;
+		}
+	}
+	return 0;
+}
+
+void I2C_WriteByte(uint8_t addr, uint8_t data)
+{
+	if (I2C1_WaitBusyFree(I2C_TIMEOUT))
+		return;
 
 	I2C_GenerateSTART(I2C1, ENABLE);
 
-	while (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_MODE_SELECT))
-		;
+	if (I2C1_WaitEvent(I2C_EVENT_MASTER_MODE_SELECT, I2C_TIMEOUT))
+		return;
 
 	I2C_Send7bitAddress(I2C1, OLED_ADDRESS, I2C_Direction_Transmitter);
 
-	while (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED))
-		;
+	if (I2C1_WaitEvent(I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED, I2C_TIMEOUT))
+		return;
 
 	I2C_SendData(I2C1, addr);
 
-	while (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_BYTE_TRANSMITTING))
-		;
+	if (I2C1_WaitEvent(I2C_EVENT_MASTER_BYTE_TRANSMITTING, I2C_TIMEOUT))
+		return;
 
 	I2C_SendData(I2C1, data);
 
-	while (!I2C_CheckEvent(I2C1, I2C_EVENT_MASTER_BYTE_TRANSMITTING))
-		;
+	if (I2C1_WaitEvent(I2C_EVENT_MASTER_BYTE_TRANSMITTING, I2C_TIMEOUT))
+		return;
 
 	I2C_GenerateSTOP(I2C1, ENABLE);
 }
@@ -494,7 +548,6 @@ void OLED_Init(void)
 {
 	/*初始化结构体*/
 	GPIO_InitTypeDef GPIO_InitStructure;
-	I2C_InitTypeDef I2C_InitStructure;
 
 	/*打开rcc时钟*/
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
@@ -513,18 +566,7 @@ void OLED_Init(void)
 	GPIO_PinAFConfig(GPIOB, GPIO_PinSource7, GPIO_AF_I2C1);
 
 	/*初始化HWI2C*/
-	I2C_StructInit(&I2C_InitStructure);
-	I2C_InitStructure.I2C_Ack = I2C_Ack_Enable;
-	I2C_InitStructure.I2C_AcknowledgedAddress = I2C_AcknowledgedAddress_7bit;
-	I2C_InitStructure.I2C_ClockSpeed = I2C_SPEED; // 400Khz//bigger is also ok
-	I2C_InitStructure.I2C_DutyCycle = I2C_DutyCycle_2;
-	I2C_InitStructure.I2C_Mode = I2C_Mode_I2C;
-	I2C_InitStructure.I2C_OwnAddress1 = 0x77; // 主机地址
-
-	I2C_Init(I2C1, &I2C_InitStructure);
-
-	/*开启I2C1*/
-	I2C_Cmd(I2C1, ENABLE);
+	I2C1_HW_Config();
 
 	delay_ms(200);
 

@@ -1,6 +1,7 @@
 #include "stm32f4xx.h"
 #include "u8g2.h"
 #include "delay.h"
+#include "oled.h"
 
 #define SCL_Pin	GPIO_Pin_6
 #define SDA_Pin	GPIO_Pin_7
@@ -97,20 +98,24 @@ uint8_t u8x8_byte_hw_i2c(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int, void *arg_p
 				break;
 
 		/* wait for the busy falg to be reset */
-		while(I2C_GetFlagStatus(I2C1,I2C_FLAG_BUSY));
+		if (I2C1_WaitBusyFree(I2C_TIMEOUT))
+			break;
 
 		/* start transfer */
 		I2C_GenerateSTART(I2C1,ENABLE);
-		while(!I2C_CheckEvent(I2C1,I2C_EVENT_MASTER_MODE_SELECT));
+		if (I2C1_WaitEvent(I2C_EVENT_MASTER_MODE_SELECT, I2C_TIMEOUT))
+			break;
 	  
 		I2C_Send7bitAddress(I2C1,u8x8_GetI2CAddress(u8x8),I2C_Direction_Transmitter);
-		while(!I2C_CheckEvent(I2C1,I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED));
+		if (I2C1_WaitEvent(I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED, I2C_TIMEOUT))
+			break;
 		
 		for(uint8_t i=0;i<buf_idx;i++)
 		{
 			I2C_SendData(I2C1,buffer[i]);
 			
-			while(I2C_CheckEvent(I2C1,I2C_EVENT_MASTER_BYTE_TRANSMITTED) != SUCCESS);
+			if (I2C1_WaitEvent(I2C_EVENT_MASTER_BYTE_TRANSMITTED, I2C_TIMEOUT))
+				break;
 		}
 		
 		I2C_GenerateSTOP(I2C1,ENABLE);
