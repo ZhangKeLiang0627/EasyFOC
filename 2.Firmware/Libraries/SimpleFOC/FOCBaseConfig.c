@@ -42,7 +42,7 @@ void TIM3_PWM_Init(u16 arr)
 	TIM_Cmd(TIM3, ENABLE);
 }
 
-// 10kHz 电流环中断源（TIM3 专职 PWM，中断改由 TIM10 承担）
+// 10kHz 电流环中断
 void TIM10_FOC_Init(void)
 {
 	TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStructure;
@@ -65,7 +65,7 @@ void TIM10_FOC_Init(void)
 	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
 	NVIC_Init(&NVIC_InitStructure);
 
-	// 中断使能延迟到 EasyFOC_Init 末尾（见 EasyFOC_Init）
+	// 中断使能延迟到 EasyFOC_Init 末尾
 	// TIM_ITConfig(TIM10, TIM_IT_Update, ENABLE);
 
 	TIM_Cmd(TIM10, ENABLE);
@@ -106,6 +106,7 @@ void FOC_GPIO_Config(void)
 
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_15;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP; // nFAULT 开漏，需上拉，低电平=故障
 	GPIO_Init(GPIOC, &GPIO_InitStructure);
 }
 
@@ -152,8 +153,6 @@ void EasyFOC_Init(void)
 	Motor_init();
 	Motor_initFOC(1.3760f, CW); // 已校准：提供偏移角和方向，开机跳过零点校准（不转电机）
 
-	// TIM10_Count_Init(); // interrupt per 1ms
-
 	// 编码器/电流偏移/零点就绪后才使能 10kHz 中断，避免中断早于 initFOC 触发
 	TIM10_FOC_Init();
 	TIM_ClearFlag(TIM10, TIM_FLAG_Update);
@@ -164,7 +163,7 @@ void EasyFOC_Init(void)
 
 #include "CommonMacro.h"
 
-// 10kHz 电流环中断：由 TIM10 更新中断触发（TIM3 已专职 PWM 输出）
+// 10kHz 电流环中断
 void TIM1_UP_TIM10_IRQHandler(void)
 {
 	if (TIM_GetITStatus(TIM10, TIM_IT_Update) == SET)
