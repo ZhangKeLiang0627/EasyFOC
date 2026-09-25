@@ -30,6 +30,12 @@ extern uint8_t USART6_Recive_flag;
 // 电流限幅上限（A）：3505 额定 0.5A、DRV8313 过流保护 3A，留安全余量
 #define MAX_CURRENT_LIMIT 2.0f
 
+// ===== 临时波形采集（PID 调参用，@1kHz 采样）=====
+#define SCOPE_N 1000 // 采样点数（@1kHz = 1000ms）
+static float scope_buf[SCOPE_N][4]; // [0]=shaft_velocity [1]=shaft_angle [2]=current_sp [3]=current.q
+static volatile uint16_t scope_idx = 0;
+static volatile uint8_t scope_state = 0; // 0=空闲 1=采集中 2=待dump
+
 // 任务句柄
 TaskHandle_t LED0Task_Handler;
 TaskHandle_t OledRefreshTask_Handler;
@@ -427,6 +433,27 @@ void Commander_Proc(void)
 			}
 		}
 		break;
+
+		case 'G': // G  启动波形采集（500 点 @1kHz = 500ms，采完自动 dump）
+			scope_idx = 0;
+			scope_state = 1;
+			printf("ScopeArm\r\n");
+			break;
+
+		case 'Y': // Y0.008  设置速度反馈 LPF 时间常数 Tf(s)，越小滞后越小、噪声越大
+			LPF_velocity.Tf = atof((const char *)(USART6_RX_BUF + 1));
+			printf("VelocityLPF=%.4f\r\n", LPF_velocity.Tf);
+			break;
+
+		case 'Z': // Z0.001  设置电流反馈 LPF 时间常数 Tf(s)
+			LPF_current_q.Tf = atof((const char *)(USART6_RX_BUF + 1));
+			printf("CurrentLPF=%.4f\r\n", LPF_current_q.Tf);
+			break;
+
+		case 'B': // B20  设置位置环 P 参数
+			P_angle.P = atof((const char *)(USART6_RX_BUF + 1));
+			printf("AngleP=%.2f\r\n", P_angle.P);
+			break;
 		}
 		// 清空接收数组，长度覆盖接收的字节数即可
 		for (int i = 0; i < 32; i++)
@@ -476,6 +503,20 @@ void CommanderProc_task(void *pvParameters)
 	{
 		Commander_Proc();
 
+		// 临时：波形采集完成则 dump（本任务优先级 6 < FOCLoop 8，dump 不会阻塞控制环）
+		if (scope_state == 2)
+		{
+			uint16_t i;
+			printf("ScopeStart\r\n");
+			for (i = 0; i < SCOPE_N; i++)
+			{
+				printf("%.3f,%.3f,%.3f,%.3f\r\n",
+					   scope_buf[i][0], scope_buf[i][1], scope_buf[i][2], scope_buf[i][3]);
+			}
+			printf("ScopeEnd\r\n");
+			scope_state = 0;
+		}
+
 		vTaskDelayUntil(&xLastWakeTime, 20);
 	}
 }
@@ -519,6 +560,21 @@ void FOCLoop_task(void *pvParameters)
 		// move() 留在 1kHz 任务：速度环/位置环/力矩环 → 输出 current_sp
 		// loopFOCISR() 已搬进 TIM10 10kHz 中断：电流环 → 输出 voltage.q → setPhaseVoltage
 		move(target);
+
+		// 临时：波形采集 @1kHz（G 命令触发）
+		if (scope_state == 1)
+		{
+			if (scope_idx < SCOPE_N)
+			{
+				scope_buf[scope_idx][0] = shaft_velocity;
+				scope_buf[scope_idx][1] = shaft_angle;
+				scope_buf[scope_idx][2] = current_sp;
+				scope_buf[scope_idx][3] = current.q;
+				scope_idx++;
+			}
+			else
+				scope_state = 2;
+		}
 
 		// every FOC control task need at least 1ms delay otherwise cannot run normally
 		vTaskDelayUntil(&xLastWakeTime, 1);
