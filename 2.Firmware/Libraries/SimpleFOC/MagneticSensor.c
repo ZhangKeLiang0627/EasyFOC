@@ -105,9 +105,23 @@ float getAngle(void)
     // tracking the number of rotations
     // in order to expand angle range form [0,2PI] to basically infinity
     d_angle = angle_data - angle_data_prev;
-    // if overflow happened track it as full rotation
+    // 1) 过零（溢出）判定：真实过零必然发生在量程边界附近（raw 接近 0 或 cpr），
+    //    因此只有上一次采样确实靠近边界时才承认过零；否则说明是读取坏值，
+    //    不能被误当成过零而去改 full_rotation_offset（那会永久污染多圈角度）。
     if (fabs(d_angle) > (0.8f * cpr))
-        full_rotation_offset += d_angle > 0 ? -_2PI : _2PI;
+    {
+        if (angle_data_prev < (0.2f * cpr) || angle_data_prev > (0.8f * cpr))
+            full_rotation_offset += d_angle > 0 ? -_2PI : _2PI;
+        else
+            angle_data = angle_data_prev;
+    }
+    // 2) 物理约束兜底：既没判为过零、又超出单步物理上限的，同样判为坏值。
+    //    10kHz 采样、最高 40rad/s 时相邻机械角变化仅约 10 counts；阈值取 128
+    //    留足余量以容忍中断偶发延迟，避免误杀正常采样。
+    else if (fabs(d_angle) > 128.0f)
+    {
+        angle_data = angle_data_prev;
+    }
     // save the current angle value for the next steps
     // in order to know if overflow happened
     angle_data_prev = angle_data;
