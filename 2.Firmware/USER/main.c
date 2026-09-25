@@ -34,7 +34,7 @@ static uint8_t foc_loop_in_isr = 1;
 static volatile uint8_t foc_pause = 0;
 
 // 电流限幅上限（A），取 DRV8313 的过流保护点
-#define MAX_CURRENT_LIMIT 3.0f
+#define MAX_CURRENT_LIMIT 2.0f
 
 // 任务句柄
 TaskHandle_t LED0Task_Handler;
