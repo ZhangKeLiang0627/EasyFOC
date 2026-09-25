@@ -130,7 +130,7 @@ void EasyFOC_Init(void)
 	voltage_sensor_align = 4.0f;	  // V，航模电机设置的值小一点比如0.5-1，云台电机设置的大一点比如2-3
 	voltage_limit = 6.0f;			  // V，主要为限制电机最大电流，最大值需小于12/1.732=6.9
 	velocity_limit = 40;			  // rad/s，角度模式时限制最大转速，力矩模式和速度模式不起作用
-	current_limit = 1.0f;			  // A，3505额定≤0.5A，限幅1A保护；foc_current/dc_current模式限制电流
+	current_limit = 1.5f;			  // A，3505额定≤0.5A；默认1.5A，上限由 MAX_CURRENT_LIMIT(3A) 约束
 	torque_controller = Type_dc_current; // 默认 DC current 电流环，N V 可切回电压模式
 	controller = Type_velocity;		  // Type_angle; //Type_torque; //Type_velocity
 	pole_pairs = 11;				  // 电机极对数，3505电机+AS5047P为11；虽然可以上电检测但有失败的概率

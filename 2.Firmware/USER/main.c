@@ -27,8 +27,46 @@ float target;
 float BatteryVoltage;
 extern uint8_t USART6_Recive_flag;
 
-// 电流限幅上限（A）：3505 额定 0.5A、DRV8313 过流保护 3A，留安全余量
-#define MAX_CURRENT_LIMIT 2.0f
+// 电流限幅上限（A）：DRV8313 过流保护 3A，故上限取 3A（等于完全依赖芯片 OCP，无软件余量）；
+// 3505 额定仅 0.5A，若非必要不建议用 L 命令拉到上限
+#define MAX_CURRENT_LIMIT 3.0f
+
+// ===== 速度环参数调度（按 |速度| 在两组参数间线性过渡）=====
+// 实测（2026-09-25，空载）：电机存在"位置锁定"的转矩脉动，正转比反转大 1.5-2 倍，
+// 且该脉动在开环恒压下就存在（与电流环/速度环无关）。固定一组增益无法兼顾全速度段：
+//   |v| <= 15：低速靠摩擦/齿槽主导，需要高增益(P0.30)才不失速顿挫，反馈滤波要轻
+//              (Tf=0.020)否则低速性能恶化 2-3 倍；
+//   |v| >= 25：脉动频率升到 20Hz 以上，高增益会让环路在 ±1A 限幅间反复撞击形成
+//              极限环（实测指令饱和 26-42%），必须降增益(P0.15)并加重反馈滤波
+//              (Tf=0.040)让环路"不理会"该脉动 —— 实测 iq_std 0.325→0.091(-72%)、
+//              饱和降到 0%，且速度跟踪不劣化。
+// 20rad/s 附近两组参数等价（iq_std 0.167 vs 0.177），故在 15-25 之间线性过渡避免突跳。
+#define VEL_SCHED_LO    15.0f  // rad/s，过渡带下界
+#define VEL_SCHED_HI    25.0f  // rad/s，过渡带上界
+#define VEL_P_LOWSPD    0.30f  // 低速组：速度环 P
+#define VEL_P_HIGHSPD   0.15f  // 高速组：速度环 P
+#define VEL_TF_LOWSPD   0.020f // 低速组：速度反馈 LPF 时间常数 Tf(s) ≈ 8Hz
+#define VEL_TF_HIGHSPD  0.040f // 高速组：速度反馈 LPF 时间常数 Tf(s) ≈ 4Hz
+
+static uint8_t vel_sched_enable = 1; // 1=按速度自动调度，0=用 P/Y 命令手动值
+
+// 按当前速度插值设置速度环 P 与速度反馈滤波（必须在 shaftVelocity() 之前调用）
+static void VelocityGainSchedule(void)
+{
+	float k;
+
+	if (!vel_sched_enable)
+		return;
+
+	k = (fabsf(shaft_velocity) - VEL_SCHED_LO) / (VEL_SCHED_HI - VEL_SCHED_LO);
+	if (k < 0.0f)
+		k = 0.0f;
+	else if (k > 1.0f)
+		k = 1.0f;
+
+	PID_velocity.P = VEL_P_LOWSPD + (VEL_P_HIGHSPD - VEL_P_LOWSPD) * k;
+	LPF_velocity.Tf = VEL_TF_LOWSPD + (VEL_TF_HIGHSPD - VEL_TF_LOWSPD) * k;
+}
 
 // ===== 临时波形采集（PID 调参用，@1kHz 采样）=====
 #define SCOPE_N 1000 // 采样点数（@1kHz = 1000ms）
@@ -299,9 +337,10 @@ void Commander_Proc(void)
 			printf("Target=%.2f\r\n", target);
 			break;
 
-		case 'P': // P0.5  设置速度环的P参数
+		case 'P': // P0.5  设置速度环的P参数（手动设置后自动关闭速度调度，K 可重新开启）
+			vel_sched_enable = 0;
 			PID_velocity.P = atof((const char *)(USART6_RX_BUF + 1));
-			printf("VelocityP=%.2f\r\n", PID_velocity.P);
+			printf("VelocityP=%.2f VelSched=OFF\r\n", PID_velocity.P);
 			break;
 
 		case 'I': // I0.2  设置速度环的I参数
@@ -400,12 +439,14 @@ void Commander_Proc(void)
 			case 'V':
 				target = 0;
 				torque_controller = Type_voltage;
+				PID_velocity.limit = voltage_limit; // 同步：电压模式下速度环输出是电压
 				printf("TorqueCtrl = Voltage!\r\n");
 				break;
 
 			case 'C':
 				target = 0;
 				torque_controller = Type_dc_current;
+				PID_velocity.limit = current_limit; // 同步：电流模式下速度环输出是电流
 				printf("TorqueCtrl = DC current!\r\n");
 				break;
 
@@ -429,6 +470,9 @@ void Commander_Proc(void)
 			else
 			{
 				current_limit = lim;
+				// 速度环输出在电流模式下就是电流指令，必须同步限幅，否则 L 命令不生效
+				if (torque_controller != Type_voltage)
+					PID_velocity.limit = current_limit;
 				printf("CurrentLimit=%.2fA\r\n", current_limit);
 			}
 		}
@@ -440,9 +484,21 @@ void Commander_Proc(void)
 			printf("ScopeArm\r\n");
 			break;
 
-		case 'Y': // Y0.008  设置速度反馈 LPF 时间常数 Tf(s)，越小滞后越小、噪声越大
+		case 'Y': // Y0.008  设置速度反馈 LPF 时间常数 Tf(s)，越小滞后越小、噪声越大（自动关闭速度调度）
+			vel_sched_enable = 0;
 			LPF_velocity.Tf = atof((const char *)(USART6_RX_BUF + 1));
-			printf("VelocityLPF=%.4f\r\n", LPF_velocity.Tf);
+			printf("VelocityLPF=%.4f VelSched=OFF\r\n", LPF_velocity.Tf);
+			break;
+
+		case 'K': // K  开关速度环参数调度（|v|<=15 用 P0.30/Tf0.020，|v|>=25 用 P0.15/Tf0.040）
+			vel_sched_enable = !vel_sched_enable;
+			if (!vel_sched_enable)
+			{
+				PID_velocity.P = VEL_P_LOWSPD;
+				LPF_velocity.Tf = VEL_TF_LOWSPD;
+			}
+			printf("VelSched=%s P=%.2f Tf=%.3f\r\n",
+				   vel_sched_enable ? "ON" : "OFF", PID_velocity.P, LPF_velocity.Tf);
 			break;
 
 		case 'Z': // Z0.001  设置电流反馈 LPF 时间常数 Tf(s)
@@ -557,6 +613,9 @@ void FOCLoop_task(void *pvParameters)
 	while (1)
 	{
 		// 循环执行FOC控制算法
+		// 按当前速度调度速度环 P / 反馈滤波（必须在 move() 内调用 shaftVelocity() 之前）
+		VelocityGainSchedule();
+
 		// move() 留在 1kHz 任务：速度环/位置环/力矩环 → 输出 current_sp
 		// loopFOCISR() 已搬进 TIM10 10kHz 中断：电流环 → 输出 voltage.q → setPhaseVoltage
 		move(target);
