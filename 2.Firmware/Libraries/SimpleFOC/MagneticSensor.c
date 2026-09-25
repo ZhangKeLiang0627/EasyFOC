@@ -149,6 +149,9 @@ float getAngle(void)
 // }
 
 // Shaft velocity calculation
+// 警告：不要从任务上下文调用本函数。电流环 loopFOC() 已在 10kHz 中断里调用 getAngle()，
+// 任务再调一次会并发读同一编码器（SPI 事务互相打断 + 多圈状态竞争）导致速度估算失效。
+// 速度请用 FOCMotor.c 的 shaftVelocity()，它只读中断更新好的 shaft_angle。
 float getVelocity(void)
 {
     long now_us;

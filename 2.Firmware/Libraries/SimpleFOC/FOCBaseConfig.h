@@ -7,7 +7,7 @@
 
 void TIM3_PWM_Init(u16 arr);
 void FOC_GPIO_Config(void);
-void TIM10_Count_Init(void);
+void TIM10_FOC_Init(void);
 void EasyFOC_Init(void);
 
 /* Defines ------------------------------------------------------------------ */
