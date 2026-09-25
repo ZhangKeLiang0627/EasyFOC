@@ -70,7 +70,8 @@ int main(void)
 
 	// u8g2图形库初始化
 	u8g2Init(&u8g2);
-	u8g2_SetFont(&u8g2, u8g2_font_wqy13_t_gb2312a); // 选择字库，若内存不够就用u8g2_font_profont15_mr
+	u8g2_SetFont(&u8g2, u8g2_font_5x8_tr); // 选择 5x8 字体
+	// u8g2_SetFont(&u8g2, u8g2_font_wqy13_t_gb2312a); // 选择字库，若内存不够就用u8g2_font_profont15_mr
 
 	// Oled打印：正在初始化
 	printf("[System] Motor init...\r\n");
