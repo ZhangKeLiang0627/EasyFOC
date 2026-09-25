@@ -72,7 +72,7 @@ uint16_t MyADC_GetValue(uint8_t channel)
     // 使能指定的ADC1的软件转换启动功能
     ADC_SoftwareStartConv(ADC1);
 
-    // 等待转换结束（带超时：EOC 可能被抢占的同源 ADC 中断清掉，不能无限等待）
+    // 等转换结束（带超时：EOC 可能被同源 ADC 中断清掉，不能无限等待）
     uint32_t timeout = 1000000;
     while (!ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) && --timeout)
         ;
@@ -111,8 +111,7 @@ float getBetteryVolt(void)
 {
     uint16_t raw;
 
-    // 采样期间关中断：10kHz 电流环中断里也会操作同一个 ADC1 规则组，
-    // 若被抢占会覆盖通道配置并清掉 EOC，导致下面的 EOC 等待死锁（OLED 任务卡死）。
+    // 采样期间关中断：10kHz 电流环中断也操作同一个 ADC1 规则组，被抢占会导致 EOC 等待死锁
     __disable_irq();
     raw = MyADC_GetValue(ADC_BATTERY);
     __enable_irq();

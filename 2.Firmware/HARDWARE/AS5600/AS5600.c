@@ -76,8 +76,7 @@ uint8_t AS5600_Init(void)
     /* init i2c interface */
     IIC_Init();
 
-    /* 读一次 RAW_ANGLE 并检查从机应答：不应答说明 SCL/SDA 接线或上拉有问题。
-       原实现忽略应答，从机不应答时只会静默读到 0xFF 脏数据，无法定位。 */
+    /* 读一次 RAW_ANGLE 检查从机应答；不应答说明接线或上拉有问题 */
     if (AS5600_Read_MultiBytes(AS5600_RAW_ANGLE_REGISTER1, 2, buf))
     {
         printf("[AS5600] I2C no ACK (addr 0x36)! check SCL=PA8 / SDA=PB4 wiring and pull-up\r\n");

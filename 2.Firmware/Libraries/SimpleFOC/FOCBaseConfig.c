@@ -104,7 +104,7 @@ void FOC_GPIO_Config(void)
 
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_15;
-	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP; // DRV8313 nFAULT 为开漏输出，需上拉；低电平=故障
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP; // DRV8313 nFAULT 开漏需上拉；低电平=故障
 	GPIO_Init(GPIOC, &GPIO_InitStructure);
 }
 
@@ -128,7 +128,7 @@ void EasyFOC_Init(void)
 	voltage_sensor_align = 2.5f;	  // V，航模电机设置的值小一点比如0.5-1，云台电机设置的大一点比如2-3
 	voltage_limit = 6.0f;			  // V，主要为限制电机最大电流，最大值需小于12/1.732=6.9
 	velocity_limit = 40;			  // rad/s，角度模式时限制最大转速，力矩模式和速度模式不起作用
-	current_limit = 0.5f;			  // A，3505额定≤0.5A，默认1.5A
+	current_limit = 0.5f;			  // A，3505额定≤0.5A
 	torque_controller = Type_dc_current; // 上电默认 DC current 电流环，N V 可切电压模式
 	controller = Type_angle;		  // 上电默认位置闭环（使能后守住当前位置）；M V / M T 可切
 	pole_pairs = 11;				  // 电机极对数，3505电机+AS5047P为11；虽然可以上电检测但有失败的概率

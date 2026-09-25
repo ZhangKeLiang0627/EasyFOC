@@ -25,10 +25,8 @@ float shaftAngle(void)
   return sensor_direction * getAngle() - sensor_offset;
 }
 // shaft velocity calculation
-// 注意：电流环 loopFOC() 已搬进 10kHz 中断，中断里会不断读编码器刷新 shaft_angle。
-// 因此本函数必须只使用中断更新好的全局 shaft_angle，不能在任务里再调用 getAngle()/
-// getVelocity() —— 两处并发读同一编码器（SPI 事务互相打断 + 多圈累加状态被竞争改写）
-// 会让速度估算彻底失效（实测 V 在 -429~+308 之间乱跳，而真实转速稳定）。
+// 注意：只能用 loopFOC() 更新好的全局 shaft_angle；任务里再调 getAngle()/getVelocity()
+// 会与中断并发读同一编码器，导致速度估算失效。
 float shaftVelocity(void)
 {
   static uint32_t ts_prev = 0;

@@ -27,22 +27,13 @@ float target;
 float BatteryVoltage;
 extern uint8_t USART6_Recive_flag;
 
-// FOC 环（loopFOC 电流环）运行位置：
-//   1 = 跑在 TIM10 10kHz 中断里（默认，配 AS5047P：SPI 读一次约 15us，中断装得下）
-//   0 = 跑在 1kHz FOCLoop_task 里（配 AS5600：I2C 读一次 100-450us，中断装不下，
-//       强行放中断会占满 CPU 导致系统卡死/冻结——实测过）
-// 由 S0/S1 切换传感器时同步设置；中断本身也随之开关。
+// loopFOC() 运行位置：1 = TIM10 10kHz 中断（AS5047P/SPI）；0 = 1kHz FOCLoop_task（AS5600/I2C 读太慢）
 static uint8_t foc_loop_in_isr = 1;
 
-// FOC 环暂停标志：切换传感器(S0/S1) 与重新标定(S2) 期间置 1。
-// 两件事都必须停掉闭环：
-//   1) 标定靠 setPhaseVoltage() 开环给固定电角度，闭环会每周期覆盖它 → 标定结果作废；
-//   2) Motor_init() 内部会 M1_Enable()，上电默认又是位置闭环 ——
-//      不停闭环就可能在重新初始化的中途把电机驱动起来（实测过"一发 S0 就爆转"）。
+// FOC 环暂停：切换传感器 / 重新标定期间置 1（标定需独占开环电压向量，且此时不应驱动电机）
 static volatile uint8_t foc_pause = 0;
 
-// 电流限幅上限（A）：DRV8313 的过流保护点是 3A，取 3A 作硬顶。
-// 注意 2804/3505 都是小电机（3505 额定 0.5A），长时间跑大限幅会发热。
+// 电流限幅上限（A），取 DRV8313 的过流保护点
 #define MAX_CURRENT_LIMIT 3.0f
 
 // 任务句柄
@@ -127,7 +118,7 @@ int main(void)
 	}
 }
 
-// 读电机状态（使能态读 PC14 输出，故障态读 PC15 输入低有效，蓝牙读 PC8 高有效）
+// 读电机状态：使能=PC14 输出，故障=PC15 输入(低有效)，蓝牙=PC8(高有效)
 static void Oled_GetMotorState(uint8_t *enabled, uint8_t *fault, uint8_t *bt)
 {
 	*enabled = GPIO_ReadOutputDataBit(GPIOC, GPIO_Pin_14);
@@ -185,9 +176,9 @@ void Oled_Proc(void)
 
 	Oled_u8g2_ClearBuffer();
 
-	// ===== 第一栏：状态 + 模式 + 供电（y 0~28）=====
+	// ===== 第一栏：状态 + 模式 + 供电 =====
 
-	// 行1：OK 状态块（lubBI08，左上）+ BT（5x8，OK 右边）+ 电压（lubBI08，右对齐）
+	// OK 状态块 + 蓝牙 + 电压
 	Oled_u8g2_SetFont(u8g2_font_lubBI08_tr);
 	Oled_DrawStateChip(enabled, fault);
 
@@ -199,7 +190,7 @@ void Oled_Proc(void)
 	sprintf(buf, "%.2fV", BatteryVoltage);
 	Oled_u8g2_ShowStr(127 - Oled_u8g2_Get_UTF8_ASCII_PixLen(buf), 12, buf);
 
-	// 行2：CTRL/MODE（5x8，左对齐）+ 电流（lubBI08，右对齐）
+	// CTRL/MODE + 电流
 	Oled_u8g2_SetFont(u8g2_font_5x8_tr);
 	sprintf(buf, "CL: [%s] ME: [%s]", Oled_CtrlStr(), Oled_ModeStr());
 	Oled_u8g2_ShowStr(0, 26, buf);
@@ -208,28 +199,26 @@ void Oled_Proc(void)
 	sprintf(buf, "%.2fA", current.q);
 	Oled_u8g2_ShowStr(127 - Oled_u8g2_Get_UTF8_ASCII_PixLen(buf), 26, buf);
 
-	// 水平分隔线（3px 白条）
+	// 水平分隔线（3px）
 	Oled_u8g2_DrawBox(0, 29, 128, 3);
 
-	// ===== 第二栏：PID + 实时量（y 32~63，3 行 5x8）=====
+	// ===== 第二栏：PID + 实时量 =====
 	Oled_u8g2_SetFont(u8g2_font_5x8_tr);
 
-	// 行1：电流环 q 轴 P + 角度
+	// 电流环 P + 角度
 	sprintf(buf, "Pq: %.2f      ANG: %.2f", PID_current_q.P, shaft_angle);
 	Oled_u8g2_ShowStr(6, 41, buf);
-	// 行2：电流环 q 轴 I + 目标值
+	// 电流环 I + 目标值
 	sprintf(buf, "Iq: %.2f     TGT: %.2f", PID_current_q.I, target);
 	Oled_u8g2_ShowStr(6, 52, buf);
-	// 行3：电流限幅 + 速度
+	// 电流限幅 + 速度
 	sprintf(buf, "LIMT: %.2fA", current_limit);
 	Oled_u8g2_ShowStr(6, 63, buf);
 	sprintf(buf, "%.2frad/s", shaft_velocity);
 	Oled_u8g2_ShowStr(70 + 6, 63, buf);
 
-	// 竖线1
+	// 两条竖线
 	Oled_u8g2_DrawBox(0, 34, 2, 30);
-
-	// 竖线2
 	Oled_u8g2_DrawBox(70, 34, 2, 30);
 
 	Oled_u8g2_SendBuffer();
@@ -252,16 +241,12 @@ void Commander_Proc(void)
 			case '0':
 				target = 0;
 
-				// 切换期间：停闭环 + 保持失能。
-				// Motor_init() 内部会无条件 M1_Enable()，而本项目上电默认是位置闭环，
-				// 若不在这里压住，切完传感器时驱动已被使能、位置环直接开始守位 ——
-				// 标定与新装配不匹配时会立刻满电流跑飞（实测过：一发 S0 就爆转）。
+				// 切换期间停闭环 + 保持失能：Motor_init() 会 M1_Enable()，不压住就可能切完就爆转
 				foc_pause = 1;
 				M1_Disable();
 
-				// AS5600 走 I2C，单次读 100-450us，10kHz 中断装不下 → 关掉 TIM10 中断，
-				// 把整个 FOC 环放回 1kHz 任务里跑（= 搬进中断之前的原始架构）。
-				// 同样注意不能用 taskENTER_CRITICAL：它会屏蔽 SysTick，使 _micros()/delay_ms 死等。
+				// AS5600 走 I2C 太慢，整个 FOC 环放回 1kHz 任务跑，关掉 TIM10 中断
+				//（不能用 taskENTER_CRITICAL：会屏蔽 SysTick 使 _micros()/delay_ms 死等）
 				foc_loop_in_isr = 0;
 				TIM_ITConfig(TIM10, TIM_IT_Update, DISABLE);
 
@@ -271,8 +256,7 @@ void Commander_Proc(void)
 				vTaskDelay(200);
 
 				pole_pairs = 7;
-				// 2804 电机（AS5600 装配）的电流环 PI —— 用户实测整定值。
-				// 放这里是为了让"切到 2804"变成一条命令搞定，不用每次上电手动发 Q/W 调增益。
+				// 2804（AS5600 装配）电流环 PI
 				PID_current_q.P = 0.8f;
 				PID_current_q.I = 35.0f;
 				PID_current_d.P = 0.8f;
@@ -281,9 +265,7 @@ void Commander_Proc(void)
 					   PID_current_q.P, PID_current_q.I, PID_current_d.P, PID_current_d.I);
 
 				Motor_init();
-				// 零点偏移已按本装配实测固化（2026-09-25 用 S2 量得 1.5018）。
-				// 旧值 5.1895 属于上一套装配，偏差 211° 电角度 → 转矩反向 → 使能后满电流跑飞。
-				// 若改动过磁铁/传感器的装配，重新发 S2 标定并更新这个数。
+				// 零点偏移按本装配实测固化（改过磁铁/传感器装配后需重新 S2 标定并更新）
 				Motor_initFOC(1.5018f, CW);
 
 				M1_Disable(); // 切换完成保持失能，必须显式 EU 才使能
@@ -295,7 +277,7 @@ void Commander_Proc(void)
 			case '1':
 				target = 0;
 
-				// 同 S0：切换期间停闭环 + 保持失能（Motor_init() 会 M1_Enable()）
+				// 同 S0：停闭环 + 保持失能
 				foc_pause = 1;
 				M1_Disable();
 
@@ -308,8 +290,7 @@ void Commander_Proc(void)
 				vTaskDelay(200);
 
 				pole_pairs = 11;
-				// 3505 电机（AS5047P 装配）的电流环 PI —— 保持与 FOCBaseConfig.c 的默认值一致。
-				// 必须显式恢复，否则从 S0 切回来会残留 2804 的增益（0.8/35）。
+				// 3505（AS5047P 装配）电流环 PI，避免从 S0 切回来残留 2804 增益
 				PID_current_q.P = 1.2f;
 				PID_current_q.I = 75.0f;
 				PID_current_d.P = 0.0f;
@@ -331,24 +312,17 @@ void Commander_Proc(void)
 				break;
 
 			case '2':
-				// S2 = 对当前电机重新标定（现场实测 sensor_direction + 电角度零点）
-				//
-				// 为什么需要它：S0/S1 用的是硬编码标定值（AS5600: 1.5018/CW 本装配实测，
-				// AS5047P: 1.3760/CW），只对当初那台电机 + 磁铁 + 传感器的装配成立。
-				// 换电机或改变装配后零点/方向都会变，症状就是使能后立刻满电流跑飞
-				// （方向反了 → 位置环变正反馈；零点偏超过 90° 电角度 → 转矩反向）。
+				// S2 = 现场重新标定当前电机的 sensor_direction + 电角度零点
+				//（S0/S1 的硬编码标定只对当初那套装配成立，换电机/改装配后必须重标）
 				target = 0;
 
-				// 标定全程靠 setPhaseVoltage() 开环给一个固定电角度，必须停掉闭环，
-				// 否则 move()/loopFOC() 每个周期都会覆盖它，测出来的零点/方向是错的。
+				// 标定靠 setPhaseVoltage() 开环给固定电角度，必须停闭环，否则会被闭环输出覆盖
 				foc_pause = 1;
 				M1_Disable();
 				TIM_ITConfig(TIM10, TIM_IT_Update, DISABLE); // 标定全在任务里做
 				foc_loop_in_isr = 0;
 
-				// 关键：Motor_initFOC() 只在 (偏移 != 0 && 方向 != UNKNOWN) 时才赋值，
-				// 直接传 (0, UNKNOWN) 不会改动全局量，alignSensor() 会因为
-				// zero_electric_angle != 0 而继续 "Skip offset calib"。必须先手工清零。
+				// 必须先清零：Motor_initFOC() 只在两参数都非空时才赋值，否则会继续 Skip calib
 				zero_electric_angle = 0;
 				sensor_direction = UNKNOWN;
 
@@ -398,7 +372,7 @@ void Commander_Proc(void)
 			printf("I=%.2f\r\n", PID_velocity.I);
 			break;
 
-		case 'L': // L1.5  设置电流限幅（A），等价于"允许的最大力矩"，上限 MAX_CURRENT_LIMIT
+		case 'L': // L1.5  设置电流限幅（A）= 允许的最大力矩，上限 MAX_CURRENT_LIMIT
 		{
 			float lim = atof((const char *)(USART6_RX_BUF + 1));
 
@@ -414,9 +388,7 @@ void Commander_Proc(void)
 			{
 				current_limit = lim;
 
-				// 必须同步速度环输出限幅：Motor_init() 只是把 current_limit 快照进
-				// PID_velocity.limit，之后不会自动跟随。不同步的话本命令在速度/位置模式下
-				// 完全不生效（历史上的真实 bug，只改了 current_limit 却看不到任何效果）。
+				// 同步速度环输出限幅：PID_velocity.limit 只在 Motor_init() 快照一次，不同步则速度/位置模式下不生效
 				PID_velocity.limit = (torque_controller == Type_voltage) ? voltage_limit : current_limit;
 
 				printf("CurrentLimit=%.2fA\r\n", current_limit);
@@ -607,17 +579,13 @@ void FOCLoop_task(void *pvParameters)
 
 	while (1)
 	{
-		// foc_pause=1（切换传感器 / 重新标定中）：整个闭环停手。
-		// 否则 move() 会用闭环输出覆盖标定用的开环电压向量（标定作废），
-		// 且在重新初始化的中途可能被 M1_Enable() 带着驱动电机。
+		// foc_pause=1（切换传感器 / 标定中）：闭环整个停手
 		if (!foc_pause)
 		{
-			// 外环：move() 恒在 1kHz 任务（位置环/速度环/力矩环 → 输出 current_sp）
+			// 外环恒在 1kHz 任务（位置/速度/力矩环 → 输出 current_sp）
 			move(target);
 
-			// 电流环 loopFOC() 的运行位置由 foc_loop_in_isr 决定：
-			//   1 -> 在 TIM10 10kHz 中断里跑（AS5047P/SPI），这里不能再调用，否则双跑
-			//   0 -> 在本任务里跑（AS5600/I2C），此时 TIM10 中断已关闭
+			// 电流环运行位置见 foc_loop_in_isr：为 1 时在 TIM10 中断里跑，这里再调就双跑了
 			if (!foc_loop_in_isr)
 				loopFOC();
 		}

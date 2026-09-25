@@ -28,7 +28,7 @@ typedef enum
 extern TorqueControlType torque_controller;
 extern MotionControlType controller;
 /******************************************************************************/
-// volatile：跨「1kHz 任务(move)」与「10kHz 中断(loopFOC)」共享，防止编译器缓存到寄存器读到旧值
+// volatile：在 1kHz 任务与 10kHz 中断间共享，防止编译器缓存到寄存器读到旧值
 extern volatile float shaft_angle; //!< current motor angle (中断写/任务读)
 extern volatile float electrical_angle; // (中断写/任务读)
 extern volatile float shaft_velocity; // (中断写/任务读)
