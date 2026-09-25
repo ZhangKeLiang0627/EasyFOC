@@ -42,7 +42,7 @@ void TIM3_PWM_Init(u16 arr)
 	TIM_Cmd(TIM3, ENABLE);
 }
 
-// 20kHz 电流环中断源（TIM3 专职 PWM，中断改由 TIM10 承担）
+// 10kHz 电流环中断源（TIM3 专职 PWM，中断改由 TIM10 承担）
 void TIM10_FOC_Init(void)
 {
 	TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStructure;
@@ -52,7 +52,7 @@ void TIM10_FOC_Init(void)
 
 	TIM_TimeBaseInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
 	TIM_TimeBaseInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
-	TIM_TimeBaseInitStructure.TIM_Period = 4200 - 1;				 // ARR = 4199 -> 84MHz/4200 = 20kHz
+	TIM_TimeBaseInitStructure.TIM_Period = 8400 - 1;				 // ARR = 8399 -> 84MHz/8400 = 10kHz
 	TIM_TimeBaseInitStructure.TIM_Prescaler = 1 - 1;				 // PSC = 0
 	TIM_TimeBaseInitStructure.TIM_RepetitionCounter = 0;
 	TIM_TimeBaseInit(TIM10, &TIM_TimeBaseInitStructure);
@@ -154,7 +154,7 @@ void EasyFOC_Init(void)
 
 	// TIM10_Count_Init(); // interrupt per 1ms
 
-	// 编码器/电流偏移/零点就绪后才使能 20kHz 中断，避免中断早于 initFOC 触发
+	// 编码器/电流偏移/零点就绪后才使能 10kHz 中断，避免中断早于 initFOC 触发
 	TIM10_FOC_Init();
 	TIM_ClearFlag(TIM10, TIM_FLAG_Update);
 	TIM_ITConfig(TIM10, TIM_IT_Update, ENABLE);
@@ -164,7 +164,7 @@ void EasyFOC_Init(void)
 
 #include "CommonMacro.h"
 
-// 20kHz 电流环中断：由 TIM10 更新中断触发（TIM3 已专职 PWM 输出）
+// 10kHz 电流环中断：由 TIM10 更新中断触发（TIM3 已专职 PWM 输出）
 void TIM1_UP_TIM10_IRQHandler(void)
 {
 	if (TIM_GetITStatus(TIM10, TIM_IT_Update) == SET)

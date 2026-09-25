@@ -37,7 +37,7 @@
 #define PWM_Period (2100)                            // 20kHz: ARR = 2100 -> 84MHz / (2 * 2100) = 20.000kHz
 // #define PWM_Period (1680)                         // ARR = 1680 -> 84MHz / (2 * 1680) = 25.000kHz
 
-/* 电流环中断采样周期: 与 PWM 频率一致 (20kHz -> 50us) */
-#define FOC_ISR_TS (5.0e-5f)                          // 20kHz 电流环固定采样周期 = 50us，用于 PID/LPF 固定 dt 版本
+/* 电流环中断采样周期: 10kHz -> 100us（PWM 仍为 20kHz，每 2 个 PWM 周期采样一次） */
+#define FOC_ISR_TS (1.0e-4f)                          // 10kHz 电流环固定采样周期 = 100us，用于 PID/LPF 固定 dt 版本
 
 #endif
