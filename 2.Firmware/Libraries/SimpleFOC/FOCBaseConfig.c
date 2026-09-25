@@ -130,7 +130,7 @@ void EasyFOC_Init(void)
 	voltage_limit = 6.0f;			  // V，主要为限制电机最大电流，最大值需小于12/1.732=6.9
 	velocity_limit = 40;			  // rad/s，角度模式时限制最大转速，力矩模式和速度模式不起作用
 	current_limit = 1.0f;			  // A，3505额定≤0.5A，限幅1A保护；foc_current/dc_current模式限制电流
-	torque_controller = Type_voltage; // 当前只有电压模式
+	torque_controller = Type_dc_current; // 默认 DC current 电流环，N V 可切回电压模式
 	controller = Type_velocity;		  // Type_angle; //Type_torque; //Type_velocity
 	pole_pairs = 11;				  // 电机极对数，3505电机+AS5047P为11；虽然可以上电检测但有失败的概率
 
@@ -139,9 +139,9 @@ void EasyFOC_Init(void)
 
 	// 速度环
 	PID_velocity.P = 0.11f; 		  // 速度环PI参数，只用P参数方便快速调试
-	PID_velocity.I = 0.98f;
+	PID_velocity.I = 0.5f;
 	PID_velocity.output_ramp = 0.0f;  // 速度爬升斜率，如果不需要可以设置为0
-	LPF_velocity.Tf = 0.01f;
+	LPF_velocity.Tf = 0.02f;
 
 	// 电流环
 	PID_current_d.P = 0.0f; 		  // 电流环PI参数，可以进入 PID_init() 函数中修改其它参数
