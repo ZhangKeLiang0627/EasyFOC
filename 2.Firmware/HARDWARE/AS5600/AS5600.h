@@ -19,9 +19,10 @@ extern "C"
  * I2C 驱动方式选择（软/硬二选一，引脚完全一致，无需改硬件）：
  *   0 = 软件 I2C（MyIIC_SW，GPIO 模拟时序）
  *   1 = 硬件 I2C3（PA8=SCL / PB4=SDA，外设收发，400kHz 快速模式）
- * 默认使用硬件 I2C：软件 I2C 单次读约 300us，在 10kHz 电流环中断里会占满 CPU。
+ * 默认使用软件 I2C（硬件 I2C3 库在失败路径上不发 STOP/不清错误标志，实测"初始化后第一笔
+ * 能读通、之后一直读回 0"，待修复后再切回）。
  */
-#define AS5600_USE_HW_I2C 1
+#define AS5600_USE_HW_I2C 0
 
 #define AS5600_CPR 4096 //12bit Resolution
 	
