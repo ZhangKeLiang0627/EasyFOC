@@ -10,8 +10,6 @@
 #define OLED_ADDRESS         0X78 
 #define OLED_I2C             I2C1
 
-#define I2C_TIMEOUT         100000  // I2C 忙等超时阈值（约几十 ms），防止被 20kHz 中断打断后锁死
-
 
 void OLED_ColorTurn(u8 i);
 void OLED_DisplayTurn(u8 i);
@@ -33,11 +31,6 @@ void OLED_Init(void);
 
 void WriteCmd(unsigned char I2C_Command);
 void WriteDat(unsigned char I2C_Data);
-
-// I2C 超时保护：等待事件/busy 释放，超时自动复位 I2C 总线并返回非 0
-void I2C1_BusRecover(void);
-uint8_t I2C1_WaitEvent(uint32_t event, uint32_t timeout);
-uint8_t I2C1_WaitBusyFree(uint32_t timeout);
 
 void OLED_PartialRefresh(uint8_t x1,uint8_t x2,uint8_t y1,uint8_t y2);
 void OLED_PartialRefreshForBuff(uint8_t x1,uint8_t x2,uint8_t y1,uint8_t y2);
