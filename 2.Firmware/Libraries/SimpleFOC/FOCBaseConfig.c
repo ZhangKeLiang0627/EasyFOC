@@ -136,11 +136,11 @@ void EasyFOC_Init(void)
 	pole_pairs = 11;				  // 电机极对数，3505电机+AS5047P为11；虽然可以上电检测但有失败的概率
 
 	// 位置环
-	P_angle.P = 20.0f; 				  // 位置环参数，只需P参数，一般不需要改动
+	P_angle.P = 15.0f; 				  // 位置环参数，只需P参数；实测 2rad 阶跃无超调
 
-	// 速度环
-	PID_velocity.P = 0.11f; 		  // 速度环PI参数，只用P参数方便快速调试
-	PID_velocity.I = 0.5f;
+	// 速度环（2026-09-25 实测整定：T=2 速度std 0.29→0.13；T=0.5 低速std 0.196→0.087）
+	PID_velocity.P = 0.30f; 		  // 太小压不住齿槽扰动(顿挫)，太大放大编码器量化噪声
+	PID_velocity.I = 2.5f;
 	PID_velocity.output_ramp = 0.0f;  // 速度爬升斜率，如果不需要可以设置为0
 	LPF_velocity.Tf = 0.02f;
 
