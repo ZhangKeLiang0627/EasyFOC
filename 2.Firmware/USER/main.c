@@ -34,6 +34,13 @@ extern uint8_t USART6_Recive_flag;
 // 由 S0/S1 切换传感器时同步设置；中断本身也随之开关。
 static uint8_t foc_loop_in_isr = 1;
 
+// FOC 环暂停标志：切换传感器(S0/S1) 与重新标定(S2) 期间置 1。
+// 两件事都必须停掉闭环：
+//   1) 标定靠 setPhaseVoltage() 开环给固定电角度，闭环会每周期覆盖它 → 标定结果作废；
+//   2) Motor_init() 内部会 M1_Enable()，上电默认又是位置闭环 ——
+//      不停闭环就可能在重新初始化的中途把电机驱动起来（实测过"一发 S0 就爆转"）。
+static volatile uint8_t foc_pause = 0;
+
 // 任务句柄
 TaskHandle_t LED0Task_Handler;
 TaskHandle_t OledRefreshTask_Handler;
@@ -240,6 +247,12 @@ void Commander_Proc(void)
 			{
 			case '0':
 				target = 0;
+
+				// 切换期间：停闭环 + 保持失能。
+				// Motor_init() 内部会无条件 M1_Enable()，而本项目上电默认是位置闭环，
+				// 若不在这里压住，切完传感器时驱动已被使能、位置环直接开始守位 ——
+				// 标定与新装配不匹配时会立刻满电流跑飞（实测过：一发 S0 就爆转）。
+				foc_pause = 1;
 				M1_Disable();
 
 				// AS5600 走 I2C，单次读 100-450us，10kHz 中断装不下 → 关掉 TIM10 中断，
@@ -255,13 +268,22 @@ void Commander_Proc(void)
 
 				pole_pairs = 7;
 				Motor_init();
-				Motor_initFOC(5.1895f, CW);
+				// 零点偏移已按本装配实测固化（2026-09-25 用 S2 量得 1.5018）。
+				// 旧值 5.1895 属于上一套装配，偏差 211° 电角度 → 转矩反向 → 使能后满电流跑飞。
+				// 若改动过磁铁/传感器的装配，重新发 S2 标定并更新这个数。
+				Motor_initFOC(1.5018f, CW);
 
-				printf("SensorChance, AS5600, Motor restart!\r\n");
+				M1_Disable(); // 切换完成保持失能，必须显式 EU 才使能
+				foc_pause = 0;
+
+				printf("SensorChance, AS5600, Motor restart! (disabled, send EU to enable)\r\n");
 				break;
 
 			case '1':
 				target = 0;
+
+				// 同 S0：切换期间停闭环 + 保持失能（Motor_init() 会 M1_Enable()）
+				foc_pause = 1;
 				M1_Disable();
 
 				// AS5047P 走 SPI（约 15us），可以留在 10kHz 中断里保证电流环带宽
@@ -276,11 +298,51 @@ void Commander_Proc(void)
 				Motor_init();
 				Motor_initFOC(1.3760f, CW);
 
+				M1_Disable(); // 切换完成保持失能，必须显式 EU 才使能
+
 				TIM_ClearFlag(TIM10, TIM_FLAG_Update);
 				TIM_ITConfig(TIM10, TIM_IT_Update, ENABLE);
 				foc_loop_in_isr = 1;
+				foc_pause = 0;
 
-				printf("SensorChance, AS5047P, Motor restart!\r\n");
+				printf("SensorChance, AS5047P, Motor restart! (disabled, send EU to enable)\r\n");
+				break;
+
+			case '2':
+				// S2 = 对当前电机重新标定（现场实测 sensor_direction + 电角度零点）
+				//
+				// 为什么需要它：S0/S1 用的是硬编码标定值（AS5600: 1.5018/CW 本装配实测，
+				// AS5047P: 1.3760/CW），只对当初那台电机 + 磁铁 + 传感器的装配成立。
+				// 换电机或改变装配后零点/方向都会变，症状就是使能后立刻满电流跑飞
+				// （方向反了 → 位置环变正反馈；零点偏超过 90° 电角度 → 转矩反向）。
+				target = 0;
+
+				// 标定全程靠 setPhaseVoltage() 开环给一个固定电角度，必须停掉闭环，
+				// 否则 move()/loopFOC() 每个周期都会覆盖它，测出来的零点/方向是错的。
+				foc_pause = 1;
+				M1_Disable();
+				TIM_ITConfig(TIM10, TIM_IT_Update, DISABLE); // 标定全在任务里做
+				foc_loop_in_isr = 0;
+
+				// 关键：Motor_initFOC() 只在 (偏移 != 0 && 方向 != UNKNOWN) 时才赋值，
+				// 直接传 (0, UNKNOWN) 不会改动全局量，alignSensor() 会因为
+				// zero_electric_angle != 0 而继续 "Skip offset calib"。必须先手工清零。
+				zero_electric_angle = 0;
+				sensor_direction = UNKNOWN;
+
+				printf("[S2] Calibrating: motor will be driven open-loop ~3s, keep shaft free...\r\n");
+				vTaskDelay(100);
+
+				Motor_init();
+				Motor_initFOC(0, UNKNOWN); // 触发 alignSensor() 实测方向 + 零点
+
+				M1_Disable(); // 标定完立刻失能，等显式 EU
+				foc_pause = 0;
+
+				printf("[S2] Done: sensor_direction=%s  zero_electric_angle=%.4f  pole_pairs=%d\r\n",
+					   (sensor_direction == CW) ? "CW" : "CCW",
+					   zero_electric_angle, (int)pole_pairs);
+				printf("[S2] FOC loop left in TASK mode(1kHz); re-send S0/S1 to restore.\r\n");
 				break;
 
 			default:
@@ -497,14 +559,20 @@ void FOCLoop_task(void *pvParameters)
 
 	while (1)
 	{
-		// 外环：move() 恒在 1kHz 任务（位置环/速度环/力矩环 → 输出 current_sp）
-		move(target);
+		// foc_pause=1（切换传感器 / 重新标定中）：整个闭环停手。
+		// 否则 move() 会用闭环输出覆盖标定用的开环电压向量（标定作废），
+		// 且在重新初始化的中途可能被 M1_Enable() 带着驱动电机。
+		if (!foc_pause)
+		{
+			// 外环：move() 恒在 1kHz 任务（位置环/速度环/力矩环 → 输出 current_sp）
+			move(target);
 
-		// 电流环 loopFOC() 的运行位置由 foc_loop_in_isr 决定：
-		//   1 -> 在 TIM10 10kHz 中断里跑（AS5047P/SPI），这里不能再调用，否则双跑
-		//   0 -> 在本任务里跑（AS5600/I2C），此时 TIM10 中断已关闭
-		if (!foc_loop_in_isr)
-			loopFOC();
+			// 电流环 loopFOC() 的运行位置由 foc_loop_in_isr 决定：
+			//   1 -> 在 TIM10 10kHz 中断里跑（AS5047P/SPI），这里不能再调用，否则双跑
+			//   0 -> 在本任务里跑（AS5600/I2C），此时 TIM10 中断已关闭
+			if (!foc_loop_in_isr)
+				loopFOC();
+		}
 
 		// every FOC control task need at least 1ms delay otherwise cannot run normally
 		vTaskDelayUntil(&xLastWakeTime, 1);
