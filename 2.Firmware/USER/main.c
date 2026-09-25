@@ -267,6 +267,15 @@ void Commander_Proc(void)
 				vTaskDelay(200);
 
 				pole_pairs = 7;
+				// 2804 电机（AS5600 装配）的电流环 PI —— 用户实测整定值。
+				// 放这里是为了让"切到 2804"变成一条命令搞定，不用每次上电手动发 Q/W 调增益。
+				PID_current_q.P = 0.8f;
+				PID_current_q.I = 35.0f;
+				PID_current_d.P = 0.8f;
+				PID_current_d.I = 35.0f;
+				printf("[S0] 2804 current-loop PI loaded: Iq P=%.2f I=%.1f | Id P=%.2f I=%.1f\r\n",
+					   PID_current_q.P, PID_current_q.I, PID_current_d.P, PID_current_d.I);
+
 				Motor_init();
 				// 零点偏移已按本装配实测固化（2026-09-25 用 S2 量得 1.5018）。
 				// 旧值 5.1895 属于上一套装配，偏差 211° 电角度 → 转矩反向 → 使能后满电流跑飞。
@@ -295,6 +304,15 @@ void Commander_Proc(void)
 				vTaskDelay(200);
 
 				pole_pairs = 11;
+				// 3505 电机（AS5047P 装配）的电流环 PI —— 保持与 FOCBaseConfig.c 的默认值一致。
+				// 必须显式恢复，否则从 S0 切回来会残留 2804 的增益（0.8/35）。
+				PID_current_q.P = 1.2f;
+				PID_current_q.I = 75.0f;
+				PID_current_d.P = 0.0f;
+				PID_current_d.I = 0.0f;
+				printf("[S1] 3505 current-loop PI restored: Iq P=%.2f I=%.1f | Id P=%.2f I=%.1f\r\n",
+					   PID_current_q.P, PID_current_q.I, PID_current_d.P, PID_current_d.I);
+
 				Motor_init();
 				Motor_initFOC(1.3760f, CW);
 
