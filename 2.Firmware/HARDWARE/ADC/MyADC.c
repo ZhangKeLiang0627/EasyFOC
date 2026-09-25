@@ -72,9 +72,12 @@ uint16_t MyADC_GetValue(uint8_t channel)
     // 使能指定的ADC1的软件转换启动功能
     ADC_SoftwareStartConv(ADC1);
 
-    // 等待转换结束
-    while (!ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC))
+    // 等待转换结束（带超时，防止 EOC 被抢占中断清掉后永久死锁）
+    uint32_t timeout = 1000000;
+    while (!ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) && --timeout)
         ;
+    if (timeout == 0)
+        return 0;
 
     // 返回最近一次ADC1规则组的转换结果
     return ADC_GetConversionValue(ADC1);
@@ -106,7 +109,13 @@ uint16_t MyADC_GetValue_Average(uint8_t channel, uint8_t times)
  */
 float getBetteryVolt(void)
 {
-    uint16_t raw = MyADC_GetValue(ADC_BATTERY);
+    uint16_t raw;
+
+    // 采样期间关中断：10kHz 电流环中断里也调 analogRead() 操作同一个 ADC1 规则组，
+    // 若抢占会覆盖通道配置并清掉 EOC，导致本函数的 EOC 等待永久死锁（OLED 任务卡死）。
+    __disable_irq();
+    raw = MyADC_GetValue(ADC_BATTERY);
+    __enable_irq();
 
     float val = (3.3f / 4096) * (raw);
     // printf("raw = %d, val = %f\r\n", raw, val);
