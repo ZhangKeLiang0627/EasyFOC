@@ -27,6 +27,13 @@ float target;
 float BatteryVoltage;
 extern uint8_t USART6_Recive_flag;
 
+// FOC 环（loopFOC 电流环）运行位置：
+//   1 = 跑在 TIM10 10kHz 中断里（默认，配 AS5047P：SPI 读一次约 15us，中断装得下）
+//   0 = 跑在 1kHz FOCLoop_task 里（配 AS5600：I2C 读一次 100-450us，中断装不下，
+//       强行放中断会占满 CPU 导致系统卡死/冻结——实测过）
+// 由 S0/S1 切换传感器时同步设置；中断本身也随之开关。
+static uint8_t foc_loop_in_isr = 1;
+
 // 任务句柄
 TaskHandle_t LED0Task_Handler;
 TaskHandle_t OledRefreshTask_Handler;
@@ -235,22 +242,20 @@ void Commander_Proc(void)
 				target = 0;
 				M1_Disable();
 
-				taskENTER_CRITICAL(); // 进入临界区
+				// AS5600 走 I2C，单次读 100-450us，10kHz 中断装不下 → 关掉 TIM10 中断，
+				// 把整个 FOC 环放回 1kHz 任务里跑（= 搬进中断之前的原始架构）。
+				// 同样注意不能用 taskENTER_CRITICAL：它会屏蔽 SysTick，使 _micros()/delay_ms 死等。
+				foc_loop_in_isr = 0;
+				TIM_ITConfig(TIM10, TIM_IT_Update, DISABLE);
 
 				MagneticSensor_OptionSelect(MAGNETIC_SENSOR_AS5600); // 磁编码器选择AS5600
 				MagneticSensor_Init();
 
-				taskEXIT_CRITICAL(); // 退出临界区
-
 				vTaskDelay(200);
-
-				taskENTER_CRITICAL(); // 进入临界区
 
 				pole_pairs = 7;
 				Motor_init();
 				Motor_initFOC(5.1895f, CW);
-
-				taskEXIT_CRITICAL(); // 退出临界区
 
 				printf("SensorChance, AS5600, Motor restart!\r\n");
 				break;
@@ -259,22 +264,21 @@ void Commander_Proc(void)
 				target = 0;
 				M1_Disable();
 
-				taskENTER_CRITICAL(); // 进入临界区
+				// AS5047P 走 SPI（约 15us），可以留在 10kHz 中断里保证电流环带宽
+				TIM_ITConfig(TIM10, TIM_IT_Update, DISABLE);
 
 				MagneticSensor_OptionSelect(MAGNETIC_SENSOR_AS5047P); // 磁编码器选择AS5047P
 				MagneticSensor_Init();
 
-				taskEXIT_CRITICAL(); // 退出临界区
-
 				vTaskDelay(200);
-
-				taskENTER_CRITICAL(); // 进入临界区
 
 				pole_pairs = 11;
 				Motor_init();
 				Motor_initFOC(1.3760f, CW);
 
-				taskEXIT_CRITICAL(); // 退出临界区
+				TIM_ClearFlag(TIM10, TIM_FLAG_Update);
+				TIM_ITConfig(TIM10, TIM_IT_Update, ENABLE);
+				foc_loop_in_isr = 1;
 
 				printf("SensorChance, AS5047P, Motor restart!\r\n");
 				break;
@@ -493,9 +497,14 @@ void FOCLoop_task(void *pvParameters)
 
 	while (1)
 	{
-		// 外环：move() 留在 1kHz 任务（位置环/速度环/力矩环 → 输出 current_sp）
-		// 电流环 loopFOC() 已搬进 TIM10 10kHz 中断，此处不能再调用（否则双跑）
+		// 外环：move() 恒在 1kHz 任务（位置环/速度环/力矩环 → 输出 current_sp）
 		move(target);
+
+		// 电流环 loopFOC() 的运行位置由 foc_loop_in_isr 决定：
+		//   1 -> 在 TIM10 10kHz 中断里跑（AS5047P/SPI），这里不能再调用，否则双跑
+		//   0 -> 在本任务里跑（AS5600/I2C），此时 TIM10 中断已关闭
+		if (!foc_loop_in_isr)
+			loopFOC();
 
 		// every FOC control task need at least 1ms delay otherwise cannot run normally
 		vTaskDelayUntil(&xLastWakeTime, 1);

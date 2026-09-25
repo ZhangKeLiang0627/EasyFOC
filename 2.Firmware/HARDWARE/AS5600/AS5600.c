@@ -1,5 +1,22 @@
 #include "AS5600.h"
-#include "MyIIC2.h"
+#include <stdio.h>
+
+/* 软/硬 I2C 二选一：通过 AS5600_USE_HW_I2C 宏切换，接口函数名统一映射为 IIC_* */
+#if AS5600_USE_HW_I2C
+#include "MyIIC_HW.h"
+#define IIC_Init             MyIIC_HW_Init
+#define IIC_Write_SingleByte MyIIC_HW_Write_SingleByte
+#define IIC_Read_SingleByte  MyIIC_HW_Read_SingleByte
+#define IIC_Write_MultiBytes MyIIC_HW_Write_MultiBytes
+#define IIC_Read_MultiBytes  MyIIC_HW_Read_MultiBytes
+#else
+#include "MyIIC_SW.h"
+#define IIC_Init             MyIIC_SW_Init
+#define IIC_Write_SingleByte MyIIC_SW_Write_SingleByte
+#define IIC_Read_SingleByte  MyIIC_SW_Read_SingleByte
+#define IIC_Write_MultiBytes MyIIC_SW_Write_MultiBytes
+#define IIC_Read_MultiBytes  MyIIC_SW_Read_MultiBytes
+#endif
 
 /**
  * @brief  使用IIC总线往AS5600的寄存器中写一字节数据
@@ -9,7 +26,7 @@
  */
 void AS5600_Write_Byte(uint8_t addr, uint8_t dat)
 {
-    MyIIC_Write_SingleByte(AS5600_IIC_ADDR, addr, dat);
+    IIC_Write_SingleByte(AS5600_IIC_ADDR, addr, dat);
 }
 
 /**
@@ -21,7 +38,7 @@ void AS5600_Write_Byte(uint8_t addr, uint8_t dat)
  */
 void AS5600_Write_MultiBytes(uint8_t REG_Address, uint8_t BytesNum, uint8_t *buf)
 {
-    MyIIC_Write_MultiBytes(AS5600_IIC_ADDR, REG_Address, BytesNum, buf);
+    IIC_Write_MultiBytes(AS5600_IIC_ADDR, REG_Address, BytesNum, buf);
 }
 
 /**
@@ -31,7 +48,7 @@ void AS5600_Write_MultiBytes(uint8_t REG_Address, uint8_t BytesNum, uint8_t *buf
  */
 uint8_t AS5600_Read_Byte(uint8_t addr)
 {
-    return MyIIC_Read_SingleByte(AS5600_IIC_ADDR, addr);
+    return IIC_Read_SingleByte(AS5600_IIC_ADDR, addr);
 }
 
 /**
@@ -43,7 +60,7 @@ uint8_t AS5600_Read_Byte(uint8_t addr)
  */
 uint8_t AS5600_Read_MultiBytes(uint8_t REG_Address, uint8_t BytesNum, uint8_t *buf)
 {
-    return MyIIC_Read_MultiBytes(AS5600_IIC_ADDR, REG_Address, BytesNum, buf);
+    return IIC_Read_MultiBytes(AS5600_IIC_ADDR, REG_Address, BytesNum, buf);
 }
 
 /**
@@ -54,8 +71,22 @@ uint8_t AS5600_Read_MultiBytes(uint8_t REG_Address, uint8_t BytesNum, uint8_t *b
  */
 uint8_t AS5600_Init(void)
 {
+    uint8_t buf[2] = {0};
+
     /* init i2c interface */
-    MyIIC_Init();
+    IIC_Init();
+
+    /* 读一次 RAW_ANGLE 并检查从机应答：不应答说明 SCL/SDA 接线或上拉有问题。
+       原实现忽略应答，从机不应答时只会静默读到 0xFF 脏数据，无法定位。 */
+    if (AS5600_Read_MultiBytes(AS5600_RAW_ANGLE_REGISTER1, 2, buf))
+    {
+        printf("[AS5600] I2C no ACK (addr 0x36)! check SCL=PA8 / SDA=PB4 wiring and pull-up\r\n");
+        return 1;
+    }
+
+    printf("[AS5600] I2C OK (%s), raw_angle=%u\r\n",
+           AS5600_USE_HW_I2C ? "HW I2C3 400kHz" : "SW I2C",
+           (unsigned int)(((uint16_t)buf[0] << 8) | (uint16_t)buf[1]));
 
     AS5600_GetRawAngle();
 

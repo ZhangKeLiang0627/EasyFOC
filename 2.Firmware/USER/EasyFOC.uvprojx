@@ -484,14 +484,24 @@
               <FilePath>..\HARDWARE\ADC\MyADC.h</FilePath>
             </File>
             <File>
-              <FileName>MyIIC2.c</FileName>
+              <FileName>MyIIC_SW.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\HARDWARE\MyIIC\MyIIC2.c</FilePath>
+              <FilePath>..\HARDWARE\MyIIC\MyIIC_SW.c</FilePath>
             </File>
             <File>
-              <FileName>MyIIC2.h</FileName>
+              <FileName>MyIIC_SW.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\HARDWARE\MyIIC\MyIIC2.h</FilePath>
+              <FilePath>..\HARDWARE\MyIIC\MyIIC_SW.h</FilePath>
+            </File>
+            <File>
+              <FileName>MyIIC_HW.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HARDWARE\MyIIC\MyIIC_HW.c</FilePath>
+            </File>
+            <File>
+              <FileName>MyIIC_HW.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\HARDWARE\MyIIC\MyIIC_HW.h</FilePath>
             </File>
             <File>
               <FileName>AS5047P.c</FileName>
