@@ -41,6 +41,10 @@ static uint8_t foc_loop_in_isr = 1;
 //      不停闭环就可能在重新初始化的中途把电机驱动起来（实测过"一发 S0 就爆转"）。
 static volatile uint8_t foc_pause = 0;
 
+// 电流限幅上限（A）：DRV8313 的过流保护点是 3A，取 3A 作硬顶。
+// 注意 2804/3505 都是小电机（3505 额定 0.5A），长时间跑大限幅会发热。
+#define MAX_CURRENT_LIMIT 3.0f
+
 // 任务句柄
 TaskHandle_t LED0Task_Handler;
 TaskHandle_t OledRefreshTask_Handler;
@@ -393,6 +397,32 @@ void Commander_Proc(void)
 			PID_velocity.I = atof((const char *)(USART6_RX_BUF + 1));
 			printf("I=%.2f\r\n", PID_velocity.I);
 			break;
+
+		case 'L': // L1.5  设置电流限幅（A），等价于"允许的最大力矩"，上限 MAX_CURRENT_LIMIT
+		{
+			float lim = atof((const char *)(USART6_RX_BUF + 1));
+
+			if (lim > MAX_CURRENT_LIMIT)
+			{
+				printf("Limit too high! Max %.2fA\r\n", MAX_CURRENT_LIMIT);
+			}
+			else if (lim <= 0.0f)
+			{
+				printf("Limit must be > 0!\r\n");
+			}
+			else
+			{
+				current_limit = lim;
+
+				// 必须同步速度环输出限幅：Motor_init() 只是把 current_limit 快照进
+				// PID_velocity.limit，之后不会自动跟随。不同步的话本命令在速度/位置模式下
+				// 完全不生效（历史上的真实 bug，只改了 current_limit 却看不到任何效果）。
+				PID_velocity.limit = (torque_controller == Type_voltage) ? voltage_limit : current_limit;
+
+				printf("CurrentLimit=%.2fA\r\n", current_limit);
+			}
+		}
+		break;
 
 		case 'V': // V  读实时速度
 			printf("Vel=%.2f\r\n", shaft_velocity);
