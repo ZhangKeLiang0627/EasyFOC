@@ -5,7 +5,7 @@
 #include "stdlib.h"	
 
 
-#define I2C_SPEED           1000000//400kHz
+#define I2C_SPEED           400000//400kHz
 #define OWN_ADDRESS          0X77
 #define OLED_ADDRESS         0X78 
 #define OLED_I2C             I2C1

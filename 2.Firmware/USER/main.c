@@ -24,7 +24,6 @@ uint8_t EncoderNum = 0;
 
 // 控制电机转速 rad/s (圈/秒)
 float target; 
-float angle;
 float BatteryVoltage;
 extern uint8_t USART6_Recive_flag;
 
@@ -46,7 +45,7 @@ void FOCLoop_task(void *pvParameters);
 
 // 应用函数
 void Commander_Proc(void);
-void Oled_Refresh(void);
+void Oled_Proc(void);
 
 int main(void)
 {
@@ -70,7 +69,8 @@ int main(void)
 
 	// u8g2图形库初始化
 	u8g2Init(&u8g2);
-	u8g2_SetFont(&u8g2, u8g2_font_wqy13_t_gb2312a); // 选择字库，若内存不够就用u8g2_font_profont15_mr
+	u8g2_SetFont(&u8g2, u8g2_font_lubBI08_tr); // 主字体 lubBI08，小号处临时切 5x8
+	// u8g2_SetFont(&u8g2, u8g2_font_wqy13_t_gb2312a); // 选择字库，若内存不够就用u8g2_font_profont15_mr
 
 	// Oled打印：正在初始化
 	printf("[System] Motor init...\r\n");
@@ -101,7 +101,7 @@ int main(void)
 
 	while (1)
 	{
-		// __IntervalExecute(Oled_Refresh(), 1000);
+		// __IntervalExecute(Oled_Proc(), 1000);
 
 		// Commander_Proc();
 
@@ -109,21 +109,110 @@ int main(void)
 	}
 }
 
-void Oled_Refresh(void)
+// 读电机状态（使能态读 PC14 输出，故障态读 PC15 输入低有效，蓝牙读 PC8 高有效）
+static void Oled_GetMotorState(uint8_t *enabled, uint8_t *fault, uint8_t *bt)
 {
+	*enabled = GPIO_ReadOutputDataBit(GPIOC, GPIO_Pin_14);
+	*fault = (GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_15) == 0);
+	*bt = GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_8);
+}
+
+// 状态块：ERR 反色块 / 使能=圆角反色块 / 待机=无框只有字
+static void Oled_DrawStateChip(uint8_t enabled, uint8_t fault)
+{
+	if (fault)
+	{
+		Oled_u8g2_DrawRBox(0, 1, 30, 13, 2);
+		Oled_u8g2_SetDrawColor(0);
+		Oled_u8g2_ShowStr(4, 11, "ERR");
+		Oled_u8g2_SetDrawColor(1);
+	}
+	else if (enabled)
+	{
+		Oled_u8g2_DrawRBox(0, 1, 24, 13, 2);
+		Oled_u8g2_SetDrawColor(0);
+		Oled_u8g2_ShowStr(4, 11, "OK");
+		Oled_u8g2_SetDrawColor(1);
+	}
+	else
+	{
+		Oled_u8g2_ShowStr(2, 11, "OK");
+	}
+}
+
+static const char *Oled_CtrlStr(void)
+{
+	switch (controller)
+	{
+	case Type_angle:
+		return "ANG";
+	case Type_torque:
+		return "TRQ";
+	default:
+		return "VEL";
+	}
+}
+
+static const char *Oled_ModeStr(void)
+{
+	return (torque_controller == Type_voltage) ? "V" : "C";
+}
+
+void Oled_Proc(void)
+{
+	static uint8_t enabled, fault, bt;
+	char buf[32];
+
+	Oled_GetMotorState(&enabled, &fault, &bt);
+
 	Oled_u8g2_ClearBuffer();
 
-	Oled_u8g2_ShowStr(0, FONT_HEIGHT, "Angle:");
-	Oled_u8g2_ShowFloat(50, FONT_HEIGHT, angle, 3, 2);
+	// ===== 第一栏：状态 + 模式 + 供电（y 0~28）=====
 
-	Oled_u8g2_ShowStr(0, FONT_HEIGHT * 2, "Speed:");
-	Oled_u8g2_ShowFloat(50, FONT_HEIGHT * 2, target, 3, 2);
+	// 行1：OK 状态块（lubBI08，左上）+ BT（5x8，OK 右边）+ 电压（lubBI08，右对齐）
+	Oled_u8g2_SetFont(u8g2_font_lubBI08_tr);
+	Oled_DrawStateChip(enabled, fault);
 
-	Oled_u8g2_ShowStr(0, FONT_HEIGHT * 3, "Vel:");
-	Oled_u8g2_ShowFloat(50, FONT_HEIGHT * 3, shaft_velocity, 2, 2);
+	Oled_u8g2_SetFont(u8g2_font_5x8_tr);
+	sprintf(buf, "BT-Comm [%c]", bt ? '*' : ' ');
+	Oled_u8g2_ShowStr(30 - 1, 9 + 2, buf);
 
-	Oled_u8g2_ShowStr(0, FONT_HEIGHT * 4, "Volt:");
-	Oled_u8g2_ShowFloat(50, FONT_HEIGHT * 4, BatteryVoltage, 2, 2);
+	Oled_u8g2_SetFont(u8g2_font_lubBI08_tr);
+	sprintf(buf, "%.2fV", BatteryVoltage);
+	Oled_u8g2_ShowStr(127 - Oled_u8g2_Get_UTF8_ASCII_PixLen(buf), 12, buf);
+
+	// 行2：CTRL/MODE（5x8，左对齐）+ 电流（lubBI08，右对齐）
+	Oled_u8g2_SetFont(u8g2_font_5x8_tr);
+	sprintf(buf, "CL: [%s] ME: [%s]", Oled_CtrlStr(), Oled_ModeStr());
+	Oled_u8g2_ShowStr(0, 26, buf);
+
+	Oled_u8g2_SetFont(u8g2_font_lubBI08_tr);
+	sprintf(buf, "%.2fA", current.q);
+	Oled_u8g2_ShowStr(127 - Oled_u8g2_Get_UTF8_ASCII_PixLen(buf), 26, buf);
+
+	// 水平分隔线（3px 白条）
+	Oled_u8g2_DrawBox(0, 29, 128, 3);
+
+	// ===== 第二栏：PID + 实时量（y 32~63，3 行 5x8）=====
+	Oled_u8g2_SetFont(u8g2_font_5x8_tr);
+
+	// 行1：电流环 q 轴 P + 角度
+	sprintf(buf, "Pq: %.2f      ANG: %.2f", PID_current_q.P, shaft_angle);
+	Oled_u8g2_ShowStr(6, 41, buf);
+	// 行2：电流环 q 轴 I + 目标值
+	sprintf(buf, "Iq: %.2f     TGT: %.2f", PID_current_q.I, target);
+	Oled_u8g2_ShowStr(6, 52, buf);
+	// 行3：电流限幅 + 速度
+	sprintf(buf, "LIMT: %.2fA", current_limit);
+	Oled_u8g2_ShowStr(6, 63, buf);
+	sprintf(buf, "%.2frad/s", shaft_velocity);
+	Oled_u8g2_ShowStr(70 + 6, 63, buf);
+
+	// 竖线1
+	Oled_u8g2_DrawBox(0, 34, 2, 30);
+
+	// 竖线2
+	Oled_u8g2_DrawBox(70, 34, 2, 30);
 
 	Oled_u8g2_SendBuffer();
 }
@@ -244,15 +333,16 @@ void Commander_Proc(void)
 			switch (USART6_RX_BUF[1])
 			{
 			case 'U':
-				target = 0;
-				controller = Type_velocity;
+				// 使能后进入位置闭环并守住当前位置（target=shaft_angle），不会转向绝对 0 度
+				controller = Type_angle;
+				target = shaft_angle;
 				M1_Enable();
-				printf("PowerUP, VelocityMODE!\r\n");
+				printf("PowerUP, AngleMODE!\r\n");
 				break;
 
 			case 'D':
 				target = 0;
-				controller = Type_velocity;
+				controller = Type_angle;
 				M1_Disable();
 				printf("PowerDOWN!\r\n");
 				break;
@@ -267,7 +357,7 @@ void Commander_Proc(void)
 			switch (USART6_RX_BUF[1])
 			{
 			case 'A':
-				target = angle;
+				target = shaft_angle; // 进入角度闭环时以当前位置为目标，避免跳到绝对角度
 				controller = Type_angle;
 				printf("Mode = Angle!\r\n");
 
@@ -339,13 +429,11 @@ void led0_task(void *pvParameters)
 void OledRefresh_task(void *pvParameters)
 {
 	TickType_t xLastWakeTime = xTaskGetTickCount();
+	BatteryVoltage = getBetteryVolt() * 6.0f; // 上电先读一次，避免首屏显示 0V
 
 	while (1)
 	{
-		// 获取实时角度
-		__IntervalExecute(angle = getAngle(), 1000);
-		
-		Oled_Refresh();
+		Oled_Proc();
 
 		__IntervalExecute(BatteryVoltage = getBetteryVolt() * 6.0f, 5000);
 
@@ -405,9 +493,9 @@ void FOCLoop_task(void *pvParameters)
 
 	while (1)
 	{
-		// 循环执行FOC控制算法
+		// 外环：move() 留在 1kHz 任务（位置环/速度环/力矩环 → 输出 current_sp）
+		// 电流环 loopFOC() 已搬进 TIM10 10kHz 中断，此处不能再调用（否则双跑）
 		move(target);
-		loopFOC();
 
 		// every FOC control task need at least 1ms delay otherwise cannot run normally
 		vTaskDelayUntil(&xLastWakeTime, 1);

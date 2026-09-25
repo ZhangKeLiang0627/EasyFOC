@@ -9,11 +9,11 @@ extern "C" {
 /*user_add*/
 void user_keyBSP_init(void);
 
-uint8_t read_key0_gpio(void);
+uint8_t read_key0_gpio(uint8_t button_id);
 
-uint8_t read_key1_gpio(void);
+uint8_t read_key1_gpio(uint8_t button_id);
 
-uint8_t read_key2_gpio(void);
+uint8_t read_key2_gpio(uint8_t button_id);
 
 void key0_press_down_Handler(void *btn);
 
