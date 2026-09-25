@@ -24,9 +24,11 @@ uint8_t EncoderNum = 0;
 
 // 控制电机转速 rad/s (圈/秒)
 float target; 
-float angle;
 float BatteryVoltage;
 extern uint8_t USART6_Recive_flag;
+
+// 电流限幅上限（A）：3505 额定 0.5A、DRV8313 过流保护 3A，留安全余量
+#define MAX_CURRENT_LIMIT 2.0f
 
 // 任务句柄
 TaskHandle_t LED0Task_Handler;
@@ -46,7 +48,7 @@ void FOCLoop_task(void *pvParameters);
 
 // 应用函数
 void Commander_Proc(void);
-void Oled_Refresh(void);
+void Oled_Proc(void);
 
 int main(void)
 {
@@ -70,7 +72,7 @@ int main(void)
 
 	// u8g2图形库初始化
 	u8g2Init(&u8g2);
-	u8g2_SetFont(&u8g2, u8g2_font_5x8_tr); // 选择 5x8 字体
+	u8g2_SetFont(&u8g2, u8g2_font_lubBI08_tr); // 主字体 lubBI08，小号处临时切 5x8
 	// u8g2_SetFont(&u8g2, u8g2_font_wqy13_t_gb2312a); // 选择字库，若内存不够就用u8g2_font_profont15_mr
 
 	// Oled打印：正在初始化
@@ -102,7 +104,7 @@ int main(void)
 
 	while (1)
 	{
-		// __IntervalExecute(Oled_Refresh(), 1000);
+		// __IntervalExecute(Oled_Proc(), 1000);
 
 		// Commander_Proc();
 
@@ -110,21 +112,110 @@ int main(void)
 	}
 }
 
-void Oled_Refresh(void)
+// 读电机状态（使能态读 PC14 输出，故障态读 PC15 输入低有效，蓝牙读 PC8 高有效）
+static void Oled_GetMotorState(uint8_t *enabled, uint8_t *fault, uint8_t *bt)
 {
+	*enabled = GPIO_ReadOutputDataBit(GPIOC, GPIO_Pin_14);
+	*fault = (GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_15) == 0);
+	*bt = GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_8);
+}
+
+// 状态块：ERR 反色块 / 使能=圆角反色块 / 待机=无框只有字
+static void Oled_DrawStateChip(uint8_t enabled, uint8_t fault)
+{
+	if (fault)
+	{
+		Oled_u8g2_DrawRBox(0, 1, 30, 13, 2);
+		Oled_u8g2_SetDrawColor(0);
+		Oled_u8g2_ShowStr(4, 11, "ERR");
+		Oled_u8g2_SetDrawColor(1);
+	}
+	else if (enabled)
+	{
+		Oled_u8g2_DrawRBox(0, 1, 24, 13, 2);
+		Oled_u8g2_SetDrawColor(0);
+		Oled_u8g2_ShowStr(4, 11, "OK");
+		Oled_u8g2_SetDrawColor(1);
+	}
+	else
+	{
+		Oled_u8g2_ShowStr(2, 11, "OK");
+	}
+}
+
+static const char *Oled_CtrlStr(void)
+{
+	switch (controller)
+	{
+	case Type_angle:
+		return "ANG";
+	case Type_torque:
+		return "TRQ";
+	default:
+		return "VEL";
+	}
+}
+
+static const char *Oled_ModeStr(void)
+{
+	return (torque_controller == Type_voltage) ? "V" : "C";
+}
+
+void Oled_Proc(void)
+{
+	static uint8_t enabled, fault, bt;
+	char buf[32];
+
+	Oled_GetMotorState(&enabled, &fault, &bt);
+
 	Oled_u8g2_ClearBuffer();
 
-	Oled_u8g2_ShowStr(0, FONT_HEIGHT, "Angle:");
-	Oled_u8g2_ShowFloat(50, FONT_HEIGHT, angle, 3, 2);
+	// ===== 第一栏：状态 + 模式 + 供电（y 0~28）=====
 
-	Oled_u8g2_ShowStr(0, FONT_HEIGHT * 2, "Speed:");
-	Oled_u8g2_ShowFloat(50, FONT_HEIGHT * 2, target, 3, 2);
+	// 行1：OK 状态块（lubBI08，左上）+ BT（5x8，OK 右边）+ 电压（lubBI08，右对齐）
+	Oled_u8g2_SetFont(u8g2_font_lubBI08_tr);
+	Oled_DrawStateChip(enabled, fault);
 
-	Oled_u8g2_ShowStr(0, FONT_HEIGHT * 3, "Vel:");
-	Oled_u8g2_ShowFloat(50, FONT_HEIGHT * 3, shaft_velocity, 2, 2);
+	Oled_u8g2_SetFont(u8g2_font_5x8_tr);
+	sprintf(buf, "BT-Comm [%c]", bt ? '*' : ' ');
+	Oled_u8g2_ShowStr(30-1, 9+2, buf);
 
-	Oled_u8g2_ShowStr(0, FONT_HEIGHT * 4, "Volt:");
-	Oled_u8g2_ShowFloat(50, FONT_HEIGHT * 4, BatteryVoltage, 2, 2);
+	Oled_u8g2_SetFont(u8g2_font_lubBI08_tr);
+	sprintf(buf, "%.2fV", BatteryVoltage);
+	Oled_u8g2_ShowStr(127 - Oled_u8g2_Get_UTF8_ASCII_PixLen(buf), 12, buf);
+
+	// 行2：CTRL/MODE（5x8，左对齐）+ 电流（lubBI08，右对齐）
+	Oled_u8g2_SetFont(u8g2_font_5x8_tr);
+	sprintf(buf, "CL: [%s] ME: [%s]", Oled_CtrlStr(), Oled_ModeStr());
+	Oled_u8g2_ShowStr(0, 26, buf);
+
+	Oled_u8g2_SetFont(u8g2_font_lubBI08_tr);
+	sprintf(buf, "%.2fA", current.q);
+	Oled_u8g2_ShowStr(127 - Oled_u8g2_Get_UTF8_ASCII_PixLen(buf), 26, buf);
+
+	// 水平分隔线（3px 白条）
+	Oled_u8g2_DrawBox(0, 29, 128, 3);
+
+	// ===== 第二栏：PID + 实时量（y 32~63，3 行 5x8）=====
+	Oled_u8g2_SetFont(u8g2_font_5x8_tr);
+
+	// 行1：电流环 q 轴 P + 角度
+	sprintf(buf, "Pq: %.2f      ANG: %.2f", PID_current_q.P, shaft_angle);
+	Oled_u8g2_ShowStr(6, 41, buf);
+	// 行2：电流环 q 轴 I + 目标值
+	sprintf(buf, "Iq: %.2f     TGT: %.2f", PID_current_q.I, target);
+	Oled_u8g2_ShowStr(6, 52, buf);
+	// 行3：电流限幅 + 速度
+	sprintf(buf, "LIMT: %.2fA", current_limit);
+	Oled_u8g2_ShowStr(6, 63, buf);
+	sprintf(buf, "%.2frad/s", shaft_velocity);
+	Oled_u8g2_ShowStr(70+6, 63, buf);
+
+	// 竖线1
+	Oled_u8g2_DrawBox(0, 34, 2, 30);
+
+	// 竖线2
+	Oled_u8g2_DrawBox(70, 34, 2, 30);
 
 	Oled_u8g2_SendBuffer();
 }
@@ -199,12 +290,17 @@ void Commander_Proc(void)
 
 		case 'T': // T6.28
 			target = atof((const char *)(USART6_RX_BUF + 1));
-			printf("RX=%.2f\r\n", target);
+			printf("Target=%.2f\r\n", target);
 			break;
 
 		case 'P': // P0.5  设置速度环的P参数
 			PID_velocity.P = atof((const char *)(USART6_RX_BUF + 1));
-			printf("P=%.2f\r\n", PID_velocity.P);
+			printf("VelocityP=%.2f\r\n", PID_velocity.P);
+			break;
+
+		case 'I': // I0.2  设置速度环的I参数
+			PID_velocity.I = atof((const char *)(USART6_RX_BUF + 1));
+			printf("VelocityI=%.2f\r\n", PID_velocity.I);
 			break;
 
 		case 'Q': // Q3.0  设置电流环P参数（DC current / foc current 模式用，单位欧姆）
@@ -217,17 +313,12 @@ void Commander_Proc(void)
 			printf("CurrentI=%.2f\r\n", PID_current_q.I);
 			break;
 
-		case 'I': // I0.2  设置速度环的I参数
-			PID_velocity.I = atof((const char *)(USART6_RX_BUF + 1));
-			printf("I=%.2f\r\n", PID_velocity.I);
-			break;
-
 		case 'V': // V  读实时速度
-			printf("Vel=%.2f\r\n", shaft_velocity);
+			printf("Velocity=%.2f\r\n", shaft_velocity);
 			break;
 
 		case 'A': // A  读绝对角度
-			printf("Ang=%.2f\r\n", shaft_angle);
+			printf("Angle=%.2f\r\n", shaft_angle);
 			break;
 
 		case 'C': // C  只读电流采样（不碰闭环），用于标定符号/偏移/增益
@@ -251,14 +342,14 @@ void Commander_Proc(void)
 			{
 			case 'U':
 				target = 0;
-				controller = Type_velocity;
+				controller = Type_angle;
 				M1_Enable();
 				printf("PowerUP, VelocityMODE!\r\n");
 				break;
 
 			case 'D':
 				target = 0;
-				controller = Type_velocity;
+				controller = Type_angle;
 				M1_Disable();
 				printf("PowerDOWN!\r\n");
 				break;
@@ -273,7 +364,7 @@ void Commander_Proc(void)
 			switch (USART6_RX_BUF[1])
 			{
 			case 'A':
-				target = angle;
+				target = shaft_angle;
 				controller = Type_angle;
 				printf("Mode = Angle!\r\n");
 
@@ -317,9 +408,27 @@ void Commander_Proc(void)
 				break;
 			}
 			break;
-		}
-		// memset(USART6_RX_BUF, 0, 32); // USART2_BUFFER_SIZE //清空接收数组,长度覆盖接收的字节数即可
 
+		case 'L': // L1.5  设置电流限幅（A），上限 MAX_CURRENT_LIMIT
+		{
+			float lim = atof((const char *)(USART6_RX_BUF + 1));
+			if (lim > MAX_CURRENT_LIMIT)
+			{
+				printf("Limit too high! Max %.2fA\r\n", MAX_CURRENT_LIMIT);
+			}
+			else if (lim <= 0.0f)
+			{
+				printf("Limit must be > 0!\r\n");
+			}
+			else
+			{
+				current_limit = lim;
+				printf("CurrentLimit=%.2fA\r\n", current_limit);
+			}
+		}
+		break;
+		}
+		// 清空接收数组，长度覆盖接收的字节数即可
 		for (int i = 0; i < 32; i++)
 		{
 			USART6_RX_BUF[i] = '\0';
@@ -335,8 +444,6 @@ void led0_task(void *pvParameters)
 	{
 		LED0 = ~LED0;
 
-		// printf("FreeRTOS is working!\r\n");
-
 		vTaskDelay(500);
 	}
 }
@@ -345,19 +452,15 @@ void led0_task(void *pvParameters)
 void OledRefresh_task(void *pvParameters)
 {
 	TickType_t xLastWakeTime = xTaskGetTickCount();
-
+	BatteryVoltage = getBetteryVolt() * 6.0f;
+	
 	while (1)
 	{
-		// 获取实时角度
-		// 注意：改用 volatile shaft_angle（由 20kHz 中断更新），不能调 getAngle()——
-		// getAngle() 含 static 多圈累加状态，任务与中断并发调用会数据竞态。
-		__IntervalExecute(angle = shaft_angle, 1000);
-		
-		Oled_Refresh();
+		Oled_Proc();
 
 		__IntervalExecute(BatteryVoltage = getBetteryVolt() * 6.0f, 5000);
 
-		__IntervalExecute(printf("[System] Voltage = %.2f\r\n", BatteryVoltage), 5000);
+		__IntervalExecute(printf("[System] Voltage = %.2f\r\n", BatteryVoltage), 10000);
 
 		// every Oled refersh task need at least 200ms delay otherwise cannot control motor normally
 		vTaskDelayUntil(&xLastWakeTime, 1000);
@@ -372,7 +475,6 @@ void CommanderProc_task(void *pvParameters)
 	while (1)
 	{
 		Commander_Proc();
-
 
 		vTaskDelayUntil(&xLastWakeTime, 20);
 	}
@@ -415,7 +517,7 @@ void FOCLoop_task(void *pvParameters)
 	{
 		// 循环执行FOC控制算法
 		// move() 留在 1kHz 任务：速度环/位置环/力矩环 → 输出 current_sp
-		// loopFOCISR() 已搬进 TIM3 20kHz 中断：电流环 → 输出 voltage.q → setPhaseVoltage
+		// loopFOCISR() 已搬进 TIM10 10kHz 中断：电流环 → 输出 voltage.q → setPhaseVoltage
 		move(target);
 
 		// every FOC control task need at least 1ms delay otherwise cannot run normally
